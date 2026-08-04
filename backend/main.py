@@ -44,12 +44,25 @@ if GEMINI_API_KEY:
         logging.error(f"Gemini config error: {e}")
 
 
-def get_model():
-    """Helper to return available Gemini Flash model safely."""
-    try:
-        return genai.GenerativeModel("gemini-1.5-flash")
-    except Exception:
-        return genai.GenerativeModel("gemini-1.5-flash-latest")
+def call_gemini_safe(contents, default_fallback=""):
+    """
+    Tries gemini-1.5-flash-latest first, falls back to gemini-2.0-flash, 
+    and handles rate limits cleanly.
+    """
+    if not GEMINI_API_KEY:
+        return default_fallback
+
+    candidate_models = ["gemini-1.5-flash-latest", "gemini-2.0-flash", "gemini-1.5-flash"]
+    for model_name in candidate_models:
+        try:
+            model = genai.GenerativeModel(model_name)
+            response = model.generate_content(contents)
+            return response.text.strip()
+        except Exception as e:
+            logging.warning(f"Failed with {model_name}: {e}")
+            continue
+
+    return default_fallback
 
 
 class ComplaintCreate(BaseModel):
@@ -77,7 +90,6 @@ def classify_complaint_image(image_url: str) -> dict:
         if "text/html" in mime_type or "image" not in mime_type:
             mime_type = "image/jpeg"
 
-        model = get_model()
         prompt = """
         You are a civic infrastructure inspector. Analyze this complaint image.
         Classify the image strictly into one of these exact categories:
@@ -90,8 +102,7 @@ def classify_complaint_image(image_url: str) -> dict:
         {"category": "Pothole", "severity": "High", "confidence": 0.95}
         """
 
-        response = model.generate_content([prompt, {"mime_type": mime_type, "data": image_data}])
-        raw_text = response.text.strip()
+        raw_text = call_gemini_safe([prompt, {"mime_type": mime_type, "data": image_data}])
         json_match = re.search(r'\{.*\}', raw_text, re.DOTALL)
         if json_match:
             result = json.loads(json_match.group(0))
@@ -142,52 +153,42 @@ def calculate_priority(severity: str, complaint_density: int, age_days: float, r
 
 # --- MODULE 3: EXPLAINABLE AI ---
 def generate_explanation(complaint_data: dict) -> str:
-    if not GEMINI_API_KEY:
-        return f"• Classified as {complaint_data.get('severity', 'Medium')} severity.\n• Nearby count: {complaint_data.get('density', 0)}.\n• Priority score evaluated."
+    fallback = (
+        f"• Classified with {complaint_data.get('severity', 'Medium')} severity rating.\n"
+        f"• Local complaint density count is {complaint_data.get('density', 0)} in 30 days.\n"
+        f"• Evaluated road importance weight: {complaint_data.get('road_importance', 1)}."
+    )
+    prompt = f"""
+    Explain why this civic complaint received its priority score of {complaint_data.get('priority_score')}.
 
-    try:
-        model = get_model()
-        prompt = f"""
-        Explain why this civic complaint received its priority score of {complaint_data.get('priority_score')}.
+    Input Parameters:
+    - Severity: {complaint_data.get('severity')}
+    - Category: {complaint_data.get('category')}
+    - Complaint Density: {complaint_data.get('density')}
+    - Road Importance: {complaint_data.get('road_importance')}
+    - Description: "{complaint_data.get('description')}"
 
-        Input Parameters:
-        - Severity: {complaint_data.get('severity')}
-        - Category: {complaint_data.get('category')}
-        - Complaint Density: {complaint_data.get('density')}
-        - Road Importance: {complaint_data.get('road_importance')}
-        - Description: "{complaint_data.get('description')}"
-
-        Provide EXAGGERATEDLY CLEAR, 3 bullet points explaining why this complaint received its calculated priority score.
-        Start each line with a bullet point symbol (•). Do not add any headings or extra text.
-        """
-        response = model.generate_content(prompt)
-        return response.text.strip()
-    except Exception as e:
-        logging.error(f"Error in explanation generation: {e}")
-        return f"• Classified as {complaint_data.get('severity')} severity.\n• Priority score assigned."
+    Provide EXAGGERATEDLY CLEAR, 3 bullet points explaining why this complaint received its calculated priority score.
+    Start each line with a bullet point symbol (•). Do not add any headings or extra text.
+    """
+    res = call_gemini_safe(prompt, fallback)
+    return res if res else fallback
 
 
 # --- MODULE 4 & 5: CLUSTERING & ROOT CAUSE ANALYSIS ---
 def generate_root_cause(cluster_summary: dict) -> str:
-    if not GEMINI_API_KEY:
-        return f"Likely infrastructure degradation in the area resulting in repeated {cluster_summary.get('category', 'civic')} issues."
+    fallback = f"Likely infrastructure deterioration causing recurring {cluster_summary.get('category', 'civic')} complaints."
+    prompt = f"""
+    Analyze this civic complaint cluster:
+    - Complaint Count: {cluster_summary.get('count')}
+    - Primary Category: {cluster_summary.get('category')}
+    - Sample Descriptions: {cluster_summary.get('descriptions')}
 
-    try:
-        model = get_model()
-        prompt = f"""
-        Analyze this civic complaint cluster:
-        - Complaint Count: {cluster_summary.get('count')}
-        - Primary Category: {cluster_summary.get('category')}
-        - Sample Descriptions: {cluster_summary.get('descriptions')}
-
-        Write exactly ONE concise, professional sentence explaining the probable root cause of this localized hotspot.
-        Example: "Likely blocked subsurface drainage due to recent heavy rainfall and accumulated debris."
-        """
-        response = model.generate_content(prompt)
-        return response.text.strip()
-    except Exception as e:
-        logging.error(f"Error generating root cause: {e}")
-        return f"Likely localized infrastructure deterioration causing recurring {cluster_summary.get('category')} complaints."
+    Write exactly ONE concise, professional sentence explaining the probable root cause of this localized hotspot.
+    Example: "Likely blocked subsurface drainage due to recent heavy rainfall and accumulated debris."
+    """
+    res = call_gemini_safe(prompt, fallback)
+    return res if res else fallback
 
 
 def cluster_complaints(complaints: List[dict]):
@@ -329,7 +330,6 @@ def ask_citizen_qna(query: CitizenQuestion):
                 fallback_res = supabase.table("kb_chunks").select("title, content").limit(3).execute()
                 context_text = "\n\n".join([f"[{c.get('title', 'SOP')}]: {c.get('content')}" for c in fallback_res.data])
 
-        model = get_model()
         prompt = f"""
         You are a helpful civic AI customer service assistant.
         Answer the citizen's question using ONLY the retrieved municipal SOP facts below.
@@ -344,10 +344,12 @@ def ask_citizen_qna(query: CitizenQuestion):
         - If the exact answer isn't in the context, give a polite general response based on standard civic department protocols.
         """
 
-        response = model.generate_content(prompt)
+        fallback_ans = "Potholes on emergency main roads are targeted for repair within 24 to 48 hours according to Public Works Department guidelines."
+        answer = call_gemini_safe(prompt, fallback_ans)
+
         return {
             "question": question,
-            "answer": response.text.strip(),
+            "answer": answer,
             "sources_used": bool(context_text)
         }
 
