@@ -47,7 +47,7 @@ if GEMINI_API_KEY:
 def get_model():
     """Helper to return available Gemini Flash model safely."""
     try:
-        return genai.GenerativeModel("gemini-2.0-flash")
+        return genai.GenerativeModel("gemini-1.5-flash")
     except Exception:
         return genai.GenerativeModel("gemini-1.5-flash-latest")
 
