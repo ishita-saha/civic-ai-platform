@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from typing import Optional
 import os
 from supabase import create_client, Client
 
@@ -23,9 +24,9 @@ if SUPABASE_URL and SUPABASE_KEY:
 
 class ComplaintCreate(BaseModel):
     description: str
-    latitude: float = None
-    longitude: float = None
-    photo_url: str = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    photo_url: Optional[str] = None
 
 @app.get("/")
 def read_root():
@@ -44,6 +45,7 @@ def create_complaint(complaint: ComplaintCreate):
     if not supabase:
         raise HTTPException(status_code=500, detail="Database connection not configured")
     
-    data = complaint.dict()
+    # Filter out None fields or keep payload clean
+    data = {k: v for k, v in complaint.dict().items() if v is not None}
     response = supabase.table("complaints").insert(data).execute()
     return response.data
