@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
@@ -8,7 +8,6 @@ from supabase import create_client, Client
 
 app = FastAPI(title="CivicFix AI API")
 
-# Enable global CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -29,8 +28,8 @@ if SUPABASE_URL and SUPABASE_KEY:
 
 class ComplaintCreate(BaseModel):
     description: str
-    latitude: Optional[float] = None
-    longitude: Optional[float] = None
+    latitude: Optional[float] = 0.0
+    longitude: Optional[float] = 0.0
     photo_url: Optional[str] = None
 
 @app.get("/")
@@ -57,15 +56,21 @@ def create_complaint(complaint: ComplaintCreate):
         )
     
     try:
+        # Guarantee non-null float defaults for NOT NULL database constraints
+        lat = complaint.latitude if complaint.latitude is not None else 0.0
+        lng = complaint.longitude if complaint.longitude is not None else 0.0
+        
         payload = {
             "description": complaint.description,
-            "latitude": complaint.latitude,
-            "longitude": complaint.longitude,
-            "photo_url": complaint.photo_url
+            "latitude": lat,
+            "longitude": lng,
+            "status": "submitted"
         }
-        clean_payload = {k: v for k, v in payload.items() if v is not None}
         
-        response = supabase.table("complaints").insert(clean_payload).execute()
+        if complaint.photo_url:
+            payload["photo_url"] = complaint.photo_url
+
+        response = supabase.table("complaints").insert(payload).execute()
         return response.data
     except Exception as e:
         logging.error(f"Insert error: {e}")
