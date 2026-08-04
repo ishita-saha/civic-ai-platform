@@ -6,7 +6,6 @@ from supabase import create_client, Client
 
 app = FastAPI(title="CivicFix AI API")
 
-# Enable CORS for all origins
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
