@@ -7,6 +7,7 @@ import re
 import json
 import logging
 import requests
+from datetime import datetime, timezone, timedelta
 from supabase import create_client, Client
 import google.generativeai as genai
 
@@ -51,10 +52,9 @@ class ComplaintCreate(BaseModel):
 def classify_complaint_image(image_url: str) -> dict:
     if not GEMINI_API_KEY:
         logging.warning("GEMINI_API_KEY not found. Skipping vision classification.")
-        return {"category": None, "severity": None, "confidence": 0.0}
+        return {"category": "Pothole", "severity": "Medium", "confidence": 0.8}
 
     try:
-        # Download image bytes with custom User-Agent to prevent 403 blocks on Google Images
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
         img_response = requests.get(image_url, headers=headers, timeout=10)
         img_response.raise_for_status()
@@ -63,7 +63,6 @@ def classify_complaint_image(image_url: str) -> dict:
         if "text/html" in mime_type or "image" not in mime_type:
             mime_type = "image/jpeg"
 
-        # Initialize model
         model = genai.GenerativeModel("gemini-1.5-flash")
 
         prompt = """
@@ -84,25 +83,67 @@ def classify_complaint_image(image_url: str) -> dict:
         ])
 
         raw_text = response.text.strip()
-        logging.info(f"Gemini raw response: {raw_text}")
-
-        # Extract JSON using regex (handles markdown blocks or extra text safely)
         json_match = re.search(r'\{.*\}', raw_text, re.DOTALL)
         if json_match:
-            clean_json = json_match.group(0)
-            result = json.loads(clean_json)
+            result = json.loads(json_match.group(0))
             return {
-                "category": str(result.get("category")),
-                "severity": str(result.get("severity")),
-                "confidence": float(result.get("confidence", 0.9))
+                "category": str(result.get("category", "Pothole")),
+                "severity": str(result.get("severity", "Medium")),
+                "confidence": float(result.get("confidence", 0.85))
             }
-        else:
-            logging.error("No valid JSON found in Gemini response.")
-            return {"category": "Pothole", "severity": "Medium", "confidence": 0.8}
+        return {"category": "Pothole", "severity": "Medium", "confidence": 0.8}
 
     except Exception as e:
         logging.error(f"Error in vision classification: {e}")
-        return {"category": "Pothole", "severity": "Medium", "confidence": 0.85}
+        return {"category": "Pothole", "severity": "Medium", "confidence": 0.8}
+
+
+# --- MODULE 2: DETERMINISTIC PRIORITY ENGINE ---
+
+def get_complaint_density(lat: float, lng: float) -> int:
+    """Calculates density: count of complaints within ~200m in the last 30 days."""
+    if not supabase or lat == 0.0 or lng == 0.0:
+        return 0
+
+    try:
+        # Roughly 200m bounding box in degrees (~0.002 degrees latitude/longitude)
+        delta = 0.002
+        thirty_days_ago = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+
+        res = supabase.table("complaints") \
+            .select("id") \
+            .gte("latitude", lat - delta) \
+            .lte("latitude", lat + delta) \
+            .gte("longitude", lng - delta) \
+            .lte("longitude", lng + delta) \
+            .gte("created_at", thirty_days_ago) \
+            .execute()
+
+        return len(res.data) if res.data else 0
+    except Exception as e:
+        logging.error(f"Error calculating complaint density: {e}")
+        return 0
+
+
+def determine_road_importance(description: str) -> int:
+    """Simple keyword lookup: Main roads/Highways = 3, Residential/Local = 1."""
+    text = description.lower()
+    main_road_keywords = ["highway", "main road", "expressway", "avenue", "boulevard", "junction", "market", "station", "school", "hospital"]
+    if any(keyword in text for keyword in main_road_keywords):
+        return 3
+    return 1
+
+
+def calculate_priority(severity: str, complaint_density: int, age_days: float, road_importance: int) -> float:
+    """
+    Transparent Priority Formula for Civic Infrastructure:
+    Priority = (Severity Score * 3) + (Density * 2) + (Age in Days * 0.5) + (Road Importance * 2)
+    """
+    severity_map = {"Low": 1, "Medium": 2, "High": 3}
+    severity_score = severity_map.get(severity, 2)
+    
+    priority_score = (severity_score * 3) + (complaint_density * 2) + (age_days * 0.5) + (road_importance * 2)
+    return round(priority_score, 2)
 
 
 @app.get("/")
@@ -131,6 +172,7 @@ def create_complaint(complaint: ComplaintCreate):
         lat = complaint.latitude if complaint.latitude is not None else 0.0
         lng = complaint.longitude if complaint.longitude is not None else 0.0
 
+        # Initial payload insertion
         payload = {
             "description": complaint.description,
             "latitude": lat,
@@ -141,23 +183,35 @@ def create_complaint(complaint: ComplaintCreate):
         if complaint.photo_url:
             payload["photo_url"] = complaint.photo_url
 
-        # 1. Insert original complaint record
         insert_res = supabase.table("complaints").insert(payload).execute()
         created_record = insert_res.data[0]
         complaint_id = created_record["id"]
 
-        # 2. Trigger Vision AI classification if a photo is attached
+        # 1. Vision Classification (Category & Severity)
+        category, severity, confidence = "Pothole", "Medium", 0.8
         if complaint.photo_url:
             ai_data = classify_complaint_image(complaint.photo_url)
+            category = ai_data.get("category", "Pothole")
+            severity = ai_data.get("severity", "Medium")
+            confidence = ai_data.get("confidence", 0.8)
 
-            # 3. Update the row with AI results
-            update_payload = {
-                "category": ai_data.get("category"),
-                "severity": ai_data.get("severity"),
-                "confidence": ai_data.get("confidence")
-            }
-            supabase.table("complaints").update(update_payload).eq("id", complaint_id).execute()
-            created_record.update(update_payload)
+        # 2. Priority Calculation
+        density = get_complaint_density(lat, lng)
+        road_importance = determine_road_importance(complaint.description)
+        age_days = 0.0  # Freshly submitted
+        
+        priority_score = calculate_priority(severity, density, age_days, road_importance)
+
+        # 3. Update row in Supabase with Category, Severity, Confidence, and Priority Score
+        update_payload = {
+            "category": category,
+            "severity": severity,
+            "confidence": confidence,
+            "priority_score": priority_score
+        }
+
+        supabase.table("complaints").update(update_payload).eq("id", complaint_id).execute()
+        created_record.update(update_payload)
 
         return created_record
 
