@@ -2,5 +2,5 @@ fastapi
 uvicorn
 supabase
 pydantic
-google-generativeai
 requests
+google-generativeai
