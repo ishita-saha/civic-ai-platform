@@ -44,6 +44,14 @@ if GEMINI_API_KEY:
         logging.error(f"Gemini config error: {e}")
 
 
+def get_model():
+    """Helper to return available Gemini Flash model safely."""
+    try:
+        return genai.GenerativeModel("gemini-2.0-flash")
+    except Exception:
+        return genai.GenerativeModel("gemini-1.5-flash-latest")
+
+
 class ComplaintCreate(BaseModel):
     description: str
     latitude: Optional[float] = 0.0
@@ -69,7 +77,7 @@ def classify_complaint_image(image_url: str) -> dict:
         if "text/html" in mime_type or "image" not in mime_type:
             mime_type = "image/jpeg"
 
-        model = genai.GenerativeModel("gemini-1.5-flash")
+        model = get_model()
         prompt = """
         You are a civic infrastructure inspector. Analyze this complaint image.
         Classify the image strictly into one of these exact categories:
@@ -138,7 +146,7 @@ def generate_explanation(complaint_data: dict) -> str:
         return f"• Classified as {complaint_data.get('severity', 'Medium')} severity.\n• Nearby count: {complaint_data.get('density', 0)}.\n• Priority score evaluated."
 
     try:
-        model = genai.GenerativeModel("gemini-1.5-flash")
+        model = get_model()
         prompt = f"""
         Explain why this civic complaint received its priority score of {complaint_data.get('priority_score')}.
 
@@ -161,12 +169,11 @@ def generate_explanation(complaint_data: dict) -> str:
 
 # --- MODULE 4 & 5: CLUSTERING & ROOT CAUSE ANALYSIS ---
 def generate_root_cause(cluster_summary: dict) -> str:
-    """Module 5: Generates one probable root-cause sentence for clusters with 3+ complaints."""
     if not GEMINI_API_KEY:
         return f"Likely infrastructure degradation in the area resulting in repeated {cluster_summary.get('category', 'civic')} issues."
 
     try:
-        model = genai.GenerativeModel("gemini-1.5-flash")
+        model = get_model()
         prompt = f"""
         Analyze this civic complaint cluster:
         - Complaint Count: {cluster_summary.get('count')}
@@ -216,7 +223,6 @@ def cluster_complaints(complaints: List[dict]):
         except Exception as e:
             logging.error(f"Failed to update cluster_id: {e}")
 
-    # Generate Root Cause for clusters with 3+ items
     for cid, items in clusters_dict.items():
         if len(items) >= 3:
             categories = [item.get("category", "Pothole") for item in items if item.get("category")]
@@ -226,7 +232,6 @@ def cluster_complaints(complaints: List[dict]):
             summary = {"count": len(items), "category": main_category, "descriptions": sample_desc}
             root_cause = generate_root_cause(summary)
 
-            # Store root cause back on each complaint row in cluster
             for item in items:
                 item["cluster_explanation"] = root_cause
                 try:
@@ -239,7 +244,6 @@ def cluster_complaints(complaints: List[dict]):
 
 # --- MODULE 6: RAG CITIZEN Q&A ---
 def get_embedding(text: str) -> List[float]:
-    """Generates embedding using Gemini text-embedding-004."""
     try:
         res = genai.embed_content(
             model="models/text-embedding-004",
@@ -282,7 +286,6 @@ def get_clusters():
 
 @app.post("/kb/seed-embeddings")
 def seed_embeddings():
-    """Generates vector embeddings for all non-embedded Knowledge Base chunks."""
     if not supabase or not GEMINI_API_KEY:
         raise HTTPException(status_code=500, detail="Supabase or Gemini key missing.")
 
@@ -304,10 +307,6 @@ def seed_embeddings():
 
 @app.post("/ask")
 def ask_citizen_qna(query: CitizenQuestion):
-    """
-    RAG Endpoint: Embeds citizen question, searches top 3 kb_chunks via vector cosine similarity,
-    and returns a grounded AI response.
-    """
     if not supabase or not GEMINI_API_KEY:
         raise HTTPException(status_code=500, detail="Supabase or Gemini key missing.")
 
@@ -318,8 +317,6 @@ def ask_citizen_qna(query: CitizenQuestion):
         context_text = ""
 
         if question_vector:
-            # Query top 3 chunks using Supabase RPC or vector similarity ordering
-            # Fallback direct select if pgvector RPC is not created
             try:
                 rpc_res = supabase.rpc("match_kb_chunks", {
                     "query_embedding": question_vector,
@@ -329,12 +326,10 @@ def ask_citizen_qna(query: CitizenQuestion):
                 matched_chunks = rpc_res.data
                 context_text = "\n\n".join([f"[{c.get('title', 'SOP')}]: {c.get('content')}" for c in matched_chunks])
             except Exception:
-                # Direct lookup fallback
                 fallback_res = supabase.table("kb_chunks").select("title, content").limit(3).execute()
                 context_text = "\n\n".join([f"[{c.get('title', 'SOP')}]: {c.get('content')}" for c in fallback_res.data])
 
-        # Synthesize answer with Gemini
-        model = genai.GenerativeModel("gemini-1.5-flash")
+        model = get_model()
         prompt = f"""
         You are a helpful civic AI customer service assistant.
         Answer the citizen's question using ONLY the retrieved municipal SOP facts below.
@@ -385,7 +380,6 @@ def create_complaint(complaint: ComplaintCreate):
         created_record = insert_res.data[0]
         complaint_id = created_record["id"]
 
-        # 1. Vision Classification
         category, severity, confidence = "Pothole", "Medium", 0.8
         if complaint.photo_url:
             ai_data = classify_complaint_image(complaint.photo_url)
@@ -393,13 +387,11 @@ def create_complaint(complaint: ComplaintCreate):
             severity = ai_data.get("severity", "Medium")
             confidence = ai_data.get("confidence", 0.8)
 
-        # 2. Priority Calculation
         density = get_complaint_density(lat, lng)
         road_importance = determine_road_importance(complaint.description)
         age_days = 0.0
         priority_score = calculate_priority(severity, density, age_days, road_importance)
 
-        # 3. Module 3: Explanation
         comp_context = {
             "description": complaint.description,
             "category": category,
@@ -410,7 +402,6 @@ def create_complaint(complaint: ComplaintCreate):
         }
         explanation = generate_explanation(comp_context)
 
-        # 4. Update row
         update_payload = {
             "category": category,
             "severity": severity,
