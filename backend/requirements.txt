@@ -4,3 +4,5 @@ supabase
 pydantic
 requests
 google-generativeai
+scikit-learn
+numpy
