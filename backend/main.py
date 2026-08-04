@@ -6,7 +6,7 @@ from supabase import create_client, Client
 
 app = FastAPI(title="CivicFix AI API")
 
-# Enable CORS for Vercel frontend
+# Enable CORS for all frontend domains
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -40,6 +40,7 @@ def get_complaints():
     return response.data
 
 @app.post("/complaints")
+@app.post("/complaints/")
 def create_complaint(complaint: ComplaintCreate):
     if not supabase:
         raise HTTPException(status_code=500, detail="Database connection not configured")
