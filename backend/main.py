@@ -1,12 +1,14 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 import os
 import re
 import json
 import logging
 import requests
+import numpy as np
+from sklearn.cluster import DBSCAN
 from datetime import datetime, timezone, timedelta
 from supabase import create_client, Client
 import google.generativeai as genai
@@ -49,9 +51,9 @@ class ComplaintCreate(BaseModel):
     photo_url: Optional[str] = None
 
 
+# --- MODULE 1: VISION CLASSIFICATION ---
 def classify_complaint_image(image_url: str) -> dict:
     if not GEMINI_API_KEY:
-        logging.warning("GEMINI_API_KEY not found. Skipping vision classification.")
         return {"category": "Pothole", "severity": "Medium", "confidence": 0.8}
 
     try:
@@ -64,7 +66,6 @@ def classify_complaint_image(image_url: str) -> dict:
             mime_type = "image/jpeg"
 
         model = genai.GenerativeModel("gemini-1.5-flash")
-
         prompt = """
         You are a civic infrastructure inspector. Analyze this complaint image.
         Classify the image strictly into one of these exact categories:
@@ -73,15 +74,11 @@ def classify_complaint_image(image_url: str) -> dict:
         Assess the severity as one of: ["Low", "Medium", "High"].
         Provide a confidence score between 0.00 and 1.00.
 
-        Respond ONLY with a valid JSON object matching this structure:
+        Respond ONLY with a valid JSON object:
         {"category": "Pothole", "severity": "High", "confidence": 0.95}
         """
 
-        response = model.generate_content([
-            prompt,
-            {"mime_type": mime_type, "data": image_data}
-        ])
-
+        response = model.generate_content([prompt, {"mime_type": mime_type, "data": image_data}])
         raw_text = response.text.strip()
         json_match = re.search(r'\{.*\}', raw_text, re.DOTALL)
         if json_match:
@@ -92,24 +89,18 @@ def classify_complaint_image(image_url: str) -> dict:
                 "confidence": float(result.get("confidence", 0.85))
             }
         return {"category": "Pothole", "severity": "Medium", "confidence": 0.8}
-
     except Exception as e:
         logging.error(f"Error in vision classification: {e}")
         return {"category": "Pothole", "severity": "Medium", "confidence": 0.8}
 
 
 # --- MODULE 2: DETERMINISTIC PRIORITY ENGINE ---
-
 def get_complaint_density(lat: float, lng: float) -> int:
-    """Calculates density: count of complaints within ~200m in the last 30 days."""
     if not supabase or lat == 0.0 or lng == 0.0:
         return 0
-
     try:
-        # Roughly 200m bounding box in degrees (~0.002 degrees latitude/longitude)
         delta = 0.002
         thirty_days_ago = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
-
         res = supabase.table("complaints") \
             .select("id") \
             .gte("latitude", lat - delta) \
@@ -118,32 +109,96 @@ def get_complaint_density(lat: float, lng: float) -> int:
             .lte("longitude", lng + delta) \
             .gte("created_at", thirty_days_ago) \
             .execute()
-
         return len(res.data) if res.data else 0
     except Exception as e:
-        logging.error(f"Error calculating complaint density: {e}")
+        logging.error(f"Error calculating density: {e}")
         return 0
 
 
 def determine_road_importance(description: str) -> int:
-    """Simple keyword lookup: Main roads/Highways = 3, Residential/Local = 1."""
     text = description.lower()
     main_road_keywords = ["highway", "main road", "expressway", "avenue", "boulevard", "junction", "market", "station", "school", "hospital"]
-    if any(keyword in text for keyword in main_road_keywords):
-        return 3
-    return 1
+    return 3 if any(kw in text for kw in main_road_keywords) else 1
 
 
 def calculate_priority(severity: str, complaint_density: int, age_days: float, road_importance: int) -> float:
-    """
-    Transparent Priority Formula for Civic Infrastructure:
-    Priority = (Severity Score * 3) + (Density * 2) + (Age in Days * 0.5) + (Road Importance * 2)
-    """
     severity_map = {"Low": 1, "Medium": 2, "High": 3}
     severity_score = severity_map.get(severity, 2)
-    
     priority_score = (severity_score * 3) + (complaint_density * 2) + (age_days * 0.5) + (road_importance * 2)
     return round(priority_score, 2)
+
+
+# --- MODULE 3: EXPLAINABLE AI (LLM EXPLANATION) ---
+def generate_explanation(complaint_data: dict) -> str:
+    """
+    Sends severity, density, road importance, and priority score to Gemini for a 3-bullet plain-language explanation.
+    """
+    if not GEMINI_API_KEY:
+        return (
+            f"• Classified with {complaint_data.get('severity', 'Medium')} severity based on visual analysis.\n"
+            f"• Nearby complaint density count in the last 30 days is {complaint_data.get('density', 0)}.\n"
+            f"• Evaluated road importance score of {complaint_data.get('road_importance', 1)} based on proximity keywords."
+        )
+
+    try:
+        model = genai.GenerativeModel("gemini-1.5-flash")
+        prompt = f"""
+        Explain why this civic complaint received its priority score of {complaint_data.get('priority_score')}.
+
+        Input Parameters:
+        - Severity: {complaint_data.get('severity')}
+        - Category: {complaint_data.get('category')}
+        - Complaint Density (Nearby within ~200m in 30 days): {complaint_data.get('density')}
+        - Road / Area Importance Rating (1-3 scale): {complaint_data.get('road_importance')}
+        - User Description: "{complaint_data.get('description')}"
+
+        Instructions:
+        Provide EXAGGERATEDLY CLEAR, 3 bullet points explaining why this complaint received its calculated priority score.
+        Start each line with a bullet point symbol (•). Do not add any headings or introductory text.
+        """
+
+        response = model.generate_content(prompt)
+        return response.text.strip()
+    except Exception as e:
+        logging.error(f"Error generating LLM explanation: {e}")
+        return f"• Calculated with {complaint_data.get('severity')} severity.\n• Density count: {complaint_data.get('density')}.\n• Priority score assigned."
+
+
+# --- MODULE 4: DBSCAN CLUSTERING ENGINE ---
+def cluster_complaints(complaints: List[dict]):
+    if not complaints or len(complaints) == 0:
+        return []
+
+    # Extract valid coordinates
+    coords = []
+    valid_complaints = []
+    for c in complaints:
+        lat = c.get("latitude", 0.0)
+        lng = c.get("longitude", 0.0)
+        if lat != 0.0 and lng != 0.0:
+            coords.append([lat, lng])
+            valid_complaints.append(c)
+
+    if len(coords) == 0:
+        return complaints
+
+    # DBSCAN: eps=0.002 (~200m radius), min_samples=3 to form a cluster
+    coords_arr = np.array(coords)
+    db = DBSCAN(eps=0.002, min_samples=3).fit(coords_arr)
+    labels = db.labels_
+
+    # Assign cluster_ids back to records
+    for i, comp in enumerate(valid_complaints):
+        cluster_id = int(labels[i]) if labels[i] != -1 else None
+        comp["cluster_id"] = cluster_id
+
+        # Update cluster_id back in Supabase table
+        try:
+            supabase.table("complaints").update({"cluster_id": cluster_id}).eq("id", comp["id"]).execute()
+        except Exception as e:
+            logging.error(f"Failed to update cluster_id for {comp['id']}: {e}")
+
+    return complaints
 
 
 @app.get("/")
@@ -162,6 +217,24 @@ def get_complaints():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/analytics/clusters")
+def get_clusters():
+    """
+    On-demand DBSCAN clustering endpoint.
+    Clusters all complaints spatially and updates cluster_id in Supabase.
+    """
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase client not initialized.")
+
+    try:
+        res = supabase.table("complaints").select("*").execute()
+        complaints = res.data
+        clustered = cluster_complaints(complaints)
+        return {"status": "success", "total_complaints": len(clustered), "complaints": clustered}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/complaints")
 @app.post("/complaints/")
 def create_complaint(complaint: ComplaintCreate):
@@ -172,7 +245,6 @@ def create_complaint(complaint: ComplaintCreate):
         lat = complaint.latitude if complaint.latitude is not None else 0.0
         lng = complaint.longitude if complaint.longitude is not None else 0.0
 
-        # Initial payload insertion
         payload = {
             "description": complaint.description,
             "latitude": lat,
@@ -187,7 +259,7 @@ def create_complaint(complaint: ComplaintCreate):
         created_record = insert_res.data[0]
         complaint_id = created_record["id"]
 
-        # 1. Vision Classification (Category & Severity)
+        # 1. Vision Classification
         category, severity, confidence = "Pothole", "Medium", 0.8
         if complaint.photo_url:
             ai_data = classify_complaint_image(complaint.photo_url)
@@ -198,16 +270,27 @@ def create_complaint(complaint: ComplaintCreate):
         # 2. Priority Calculation
         density = get_complaint_density(lat, lng)
         road_importance = determine_road_importance(complaint.description)
-        age_days = 0.0  # Freshly submitted
-        
+        age_days = 0.0
         priority_score = calculate_priority(severity, density, age_days, road_importance)
 
-        # 3. Update row in Supabase with Category, Severity, Confidence, and Priority Score
+        # 3. Module 3: Generate Plain Language LLM Explanation
+        comp_context = {
+            "description": complaint.description,
+            "category": category,
+            "severity": severity,
+            "density": density,
+            "road_importance": road_importance,
+            "priority_score": priority_score
+        }
+        explanation = generate_explanation(comp_context)
+
+        # 4. Update row in Supabase with AI Vision, Priority, & Explanation
         update_payload = {
             "category": category,
             "severity": severity,
             "confidence": confidence,
-            "priority_score": priority_score
+            "priority_score": priority_score,
+            "ai_explanation": explanation
         }
 
         supabase.table("complaints").update(update_payload).eq("id", complaint_id).execute()
