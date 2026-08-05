@@ -650,3 +650,93 @@ def get_analytics_dashboard():
     except Exception as e:
         logging.error(f"Error generating dashboard metrics: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+# --- STEP 3.5: AI RECOMMENDATIONS PANEL API ---
+@app.get("/admin/recommendations")
+def get_ai_recommendations():
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase client not initialized.")
+    try:
+        # Fetch all active complaints
+        res = supabase.table("complaints").select("*").execute()
+        records = res.data or []
+
+        # Run DBSCAN clustering across active complaints
+        clustered_records = cluster_complaints(records)
+
+        # Group complaints by cluster_id (ignore noise/unclustered points)
+        clusters_map = {}
+        for item in clustered_records:
+            cid = item.get("cluster_id")
+            if cid is not None:
+                if cid not in clusters_map:
+                    clusters_map[cid] = []
+                clusters_map[cid].append(item)
+
+        recommendations = []
+
+        # Department mapping helper
+        dept_map = {
+            "Pothole": {"dept": "Public Works Dept (Roads)", "team": "Alpha Rapid Paving Crew"},
+            "Waterlogging": {"dept": "Drainage & Flood Control", "team": "Hydraulic Pump Unit 3"},
+            "Waste": {"dept": "Sanitation & Solid Waste", "team": "Sanitation Task Force B"},
+            "Streetlight": {"dept": "Electrical Infrastructure", "team": "Grid Maintenance Team 1"},
+            "Drainage": {"dept": "Civic Utilities", "team": "Subsurface Pipe Maintenance"}
+        }
+
+        for cid, items in clusters_map.items():
+            count = len(items)
+            if count == 0:
+                continue
+
+            # Determine dominant category
+            categories = [i.get("category", "Pothole") for i in items if i.get("category")]
+            dominant_category = max(set(categories), key=categories.count) if categories else "Pothole"
+
+            # Calculate average priority score of cluster
+            priority_scores = [float(i.get("priority_score", 0)) for i in items]
+            avg_priority = round(sum(priority_scores) / len(priority_scores), 1) if priority_scores else 15.0
+
+            # Calculate centroid coordinates
+            lats = [i.get("latitude", 0.0) for i in items if i.get("latitude")]
+            lngs = [i.get("longitude", 0.0) for i in items if i.get("longitude")]
+            centroid_lat = round(sum(lats) / len(lats), 6) if lats else 0.0
+            centroid_lng = round(sum(lngs) / len(lngs), 6) if lngs else 0.0
+
+            # Root cause explanation from cluster
+            root_cause = items[0].get("cluster_explanation") or f"High concentration of localized {dominant_category.lower()} failures requiring immediate batch repair."
+
+            dept_info = dept_map.get(dominant_category, {"dept": "General Municipal Services", "team": "Rapid Response Crew"})
+
+            # Generate structured reasoning chain
+            reasoning_chain = [
+                f"Spike detected: {count} complaints within ~200 meter radius.",
+                f"Cluster Average Priority: {avg_priority} based on high local density weight.",
+                f"Root Cause Diagnosis: {root_cause}"
+            ]
+
+            recommendations.append({
+                "cluster_id": cid,
+                "category": dominant_category,
+                "complaint_count": count,
+                "average_priority": avg_priority,
+                "location": {"lat": centroid_lat, "lng": centroid_lng},
+                "recommended_department": dept_info["dept"],
+                "suggested_deployment": dept_info["team"],
+                "root_cause_explanation": root_cause,
+                "reasoning_chain": reasoning_chain,
+                "sample_complaint_ids": [i.get("id") for i in items[:3]]
+            })
+
+        # Sort recommendations by highest priority and complaint count
+        recommendations.sort(key=lambda x: (x["average_priority"], x["complaint_count"]), reverse=True)
+
+        return {
+            "status": "success",
+            "total_clusters_analyzed": len(recommendations),
+            "recommendations": recommendations
+        }
+
+    except Exception as e:
+        logging.error(f"Error fetching AI recommendations: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
