@@ -294,7 +294,6 @@ def get_complaints(
         response = query.execute()
         records = response.data or []
 
-        # Step 3.2 On-The-Fly SLA Escalation Computation (> 24 Hours in non-resolved state)
         now = datetime.now(timezone.utc)
         for item in records:
             item_status = item.get("status", "submitted")
@@ -309,7 +308,7 @@ def get_complaints(
                     time_diff = now - last_updated
                     if time_diff.total_seconds() > 86400:  # 24 Hours
                         is_escalated = True
-                        effective_priority += 10.0  # Fixed SLA escalation priority bump
+                        effective_priority += 10.0
                 except Exception as e:
                     logging.error(f"Date parsing error for SLA: {e}")
 
@@ -333,20 +332,23 @@ def update_complaint_status(complaint_id: str, payload: StatusUpdate):
         raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of {valid_statuses}")
 
     try:
-        current_res = supabase.table("complaints").select("status").eq("id", complaint_id).execute()
+        current_res = supabase.table("complaints").select("status, user_id, category").eq("id", complaint_id).execute()
         if not current_res.data:
             raise HTTPException(status_code=404, detail="Complaint not found.")
 
-        old_status = current_res.data[0].get("status", "submitted")
+        complaint_record = current_res.data[0]
+        old_status = complaint_record.get("status", "submitted")
+        user_id = complaint_record.get("user_id")
+        category = complaint_record.get("category", "Complaint")
         now_iso = datetime.now(timezone.utc).isoformat()
 
-        # Update status & status_updated_at timestamp
+        # 1. Update status & timestamp
         update_res = supabase.table("complaints").update({
             "status": new_status,
             "status_updated_at": now_iso
         }).eq("id", complaint_id).execute()
 
-        # Append to status_history log table
+        # 2. Append to status_history log
         try:
             supabase.table("status_history").insert({
                 "complaint_id": complaint_id,
@@ -356,6 +358,21 @@ def update_complaint_status(complaint_id: str, payload: StatusUpdate):
             }).execute()
         except Exception as e:
             logging.error(f"Failed logging status history: {e}")
+
+        # 3. Create In-App Notification (STEP 3.3)
+        try:
+            readable_status = new_status.replace("_", " ").title()
+            notification_message = f"Your {category} complaint status was updated to '{readable_status}'."
+            
+            supabase.table("notifications").insert({
+                "complaint_id": complaint_id,
+                "user_id": user_id,
+                "message": notification_message,
+                "is_read": False,
+                "created_at": now_iso
+            }).execute()
+        except Exception as e:
+            logging.error(f"Failed generating in-app notification: {e}")
 
         return update_res.data[0]
     except Exception as e:
@@ -376,6 +393,34 @@ def assign_field_worker(complaint_id: str, payload: AssignWorker):
             raise HTTPException(status_code=404, detail="Complaint not found.")
 
         return update_res.data[0]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# --- STEP 3.3: IN-APP NOTIFICATIONS API ---
+@app.get("/notifications")
+def get_notifications(user_id: Optional[str] = None):
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase client not initialized.")
+    try:
+        query = supabase.table("notifications").select("*").order("created_at", desc=True)
+        if user_id:
+            query = query.eq("user_id", user_id)
+        res = query.execute()
+        return res.data or []
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.patch("/notifications/{notification_id}/read")
+def mark_notification_read(notification_id: str):
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase client not initialized.")
+    try:
+        res = supabase.table("notifications").update({"is_read": True}).eq("id", notification_id).execute()
+        if not res.data:
+            raise HTTPException(status_code=404, detail="Notification not found.")
+        return res.data[0]
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
