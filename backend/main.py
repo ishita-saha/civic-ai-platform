@@ -364,14 +364,19 @@ def update_complaint_status(complaint_id: str, payload: StatusUpdate):
             readable_status = new_status.replace("_", " ").title()
             notification_message = f"Your {category} complaint status was updated to '{readable_status}'."
             
-            supabase.table("notifications").insert({
+            notif_payload = {
                 "complaint_id": complaint_id,
-                "user_id": user_id,
                 "message": notification_message,
                 "is_read": False,
                 "created_at": now_iso
-            }).execute()
+            }
+            if user_id:
+                notif_payload["user_id"] = user_id
+
+            notif_res = supabase.table("notifications").insert(notif_payload).execute()
+            print("NOTIFICATION CREATED:", notif_res.data)
         except Exception as e:
+            print("NOTIFICATION FAILED:", str(e))
             logging.error(f"Failed generating in-app notification: {e}")
 
         return update_res.data[0]
