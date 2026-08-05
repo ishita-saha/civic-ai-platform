@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, List
@@ -45,10 +45,6 @@ if GEMINI_API_KEY:
 
 
 def call_gemini_safe(contents, default_fallback=""):
-    """
-    Tries gemini-1.5-flash-latest first, falls back to gemini-2.0-flash, 
-    and handles rate limits cleanly.
-    """
     if not GEMINI_API_KEY:
         return default_fallback
 
@@ -70,6 +66,14 @@ class ComplaintCreate(BaseModel):
     latitude: Optional[float] = 0.0
     longitude: Optional[float] = 0.0
     photo_url: Optional[str] = None
+
+
+class StatusUpdate(BaseModel):
+    status: str
+
+
+class AssignWorker(BaseModel):
+    assigned_to: str
 
 
 class CitizenQuestion(BaseModel):
@@ -262,13 +266,116 @@ def read_root():
     return {"message": "CivicFix AI Backend is running!"}
 
 
+# --- STEP 3.1 & 3.2: ADMIN WORKFLOW & ON-THE-FLY SLA ESCALATION ---
 @app.get("/complaints")
-def get_complaints():
+def get_complaints(
+    category: Optional[str] = None,
+    department_id: Optional[str] = None,
+    priority_min: Optional[float] = Query(None),
+    status: Optional[str] = None,
+    location_search: Optional[str] = None
+):
     if not supabase:
         return []
     try:
-        response = supabase.table("complaints").select("*").execute()
-        return response.data
+        query = supabase.table("complaints").select("*")
+
+        if category:
+            query = query.eq("category", category)
+        if department_id:
+            query = query.eq("department_id", department_id)
+        if priority_min is not None:
+            query = query.gte("priority_score", priority_min)
+        if status:
+            query = query.eq("status", status)
+        if location_search:
+            query = query.ilike("description", f"%{location_search}%")
+
+        response = query.execute()
+        records = response.data or []
+
+        # Step 3.2 On-The-Fly SLA Escalation Computation (> 24 Hours in non-resolved state)
+        now = datetime.now(timezone.utc)
+        for item in records:
+            item_status = item.get("status", "submitted")
+            last_updated_str = item.get("status_updated_at") or item.get("created_at")
+            
+            is_escalated = False
+            effective_priority = float(item.get("priority_score") or 0.0)
+
+            if item_status not in ["resolved", "closed"] and last_updated_str:
+                try:
+                    last_updated = datetime.fromisoformat(last_updated_str.replace("Z", "+00:00"))
+                    time_diff = now - last_updated
+                    if time_diff.total_seconds() > 86400:  # 24 Hours
+                        is_escalated = True
+                        effective_priority += 10.0  # Fixed SLA escalation priority bump
+                except Exception as e:
+                    logging.error(f"Date parsing error for SLA: {e}")
+
+            item["is_escalated"] = is_escalated
+            item["effective_priority_score"] = round(effective_priority, 2)
+
+        return records
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.patch("/complaints/{complaint_id}/status")
+def update_complaint_status(complaint_id: str, payload: StatusUpdate):
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase client not initialized.")
+
+    valid_statuses = ["submitted", "acknowledged", "in_progress", "resolved", "closed"]
+    new_status = payload.status.lower()
+
+    if new_status not in valid_statuses:
+        raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of {valid_statuses}")
+
+    try:
+        current_res = supabase.table("complaints").select("status").eq("id", complaint_id).execute()
+        if not current_res.data:
+            raise HTTPException(status_code=404, detail="Complaint not found.")
+
+        old_status = current_res.data[0].get("status", "submitted")
+        now_iso = datetime.now(timezone.utc).isoformat()
+
+        # Update status & status_updated_at timestamp
+        update_res = supabase.table("complaints").update({
+            "status": new_status,
+            "status_updated_at": now_iso
+        }).eq("id", complaint_id).execute()
+
+        # Append to status_history log table
+        try:
+            supabase.table("status_history").insert({
+                "complaint_id": complaint_id,
+                "old_status": old_status,
+                "new_status": new_status,
+                "changed_at": now_iso
+            }).execute()
+        except Exception as e:
+            logging.error(f"Failed logging status history: {e}")
+
+        return update_res.data[0]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.patch("/complaints/{complaint_id}/assign")
+def assign_field_worker(complaint_id: str, payload: AssignWorker):
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase client not initialized.")
+
+    try:
+        update_res = supabase.table("complaints").update({
+            "assigned_to": payload.assigned_to
+        }).eq("id", complaint_id).execute()
+
+        if not update_res.data:
+            raise HTTPException(status_code=404, detail="Complaint not found.")
+
+        return update_res.data[0]
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
