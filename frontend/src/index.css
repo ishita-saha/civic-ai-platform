@@ -1,111 +1,1360 @@
+/* ==========================================================================
+   CivicFix — design system
+   Tokens first, then reset, then primitives. Components style themselves
+   from these tokens only; no component should invent a raw hex value.
+   ========================================================================== */
+
 :root {
-  --text: #4a4844;
-  --text-h: #2e2a27;
-  --bg: #f5f4f2;
-  --border: #dcd7d1;
-  --code-bg: #ece8e7;
-  --accent: #7b756c;
-  --accent-bg: rgba(123, 117, 108, 0.12);
-  --accent-border: rgba(123, 117, 108, 0.4);
-  --social-bg: rgba(235, 232, 226, 0.55);
-  --shadow: rgba(0, 0, 0, 0.08) 0 10px 30px -10px, rgba(0, 0, 0, 0.05) 0 4px 8px -4px;
+  /* --- Neutrals. Warm-grey ramp; the canvas is off-white, not pure white,
+         so white cards actually read as raised surfaces. --- */
+  --c-canvas: #f7f7f5;
+  --c-surface: #ffffff;
+  --c-surface-2: #fbfbfa;
+  --c-surface-3: #f2f2ef;
+  --c-line: #e6e5e1;
+  --c-line-strong: #d6d5d0;
 
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
+  --c-ink: #17161a;
+  --c-ink-2: #4a4852;
+  --c-ink-3: #77747f;
+  --c-ink-4: #a3a0a9;
 
-  font: 18px/145% var(--sans);
-  letter-spacing: 0.18px;
-  color-scheme: light dark;
-  color: var(--text);
-  background: var(--bg);
-  min-height: 100vh;
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
+  /* --- Brand. Indigo reads civic/institutional without going full
+         municipal-website blue. --- */
+  --c-brand: #4f46e5;
+  --c-brand-hover: #4338ca;
+  --c-brand-soft: #eef2ff;
+  --c-brand-ink: #3730a3;
+
+  /* --- Semantics, one soft + one strong per state --- */
+  --c-warn: #b45309;
+  --c-warn-soft: #fef4e6;
+  --c-info: #1d4ed8;
+  --c-info-soft: #eaf0ff;
+  --c-ok: #15803d;
+  --c-ok-soft: #e9f7ee;
+  --c-danger: #b91c1c;
+  --c-danger-soft: #fdeceb;
+
+  /* --- Elevation. Layered shadows; a single blur reads flat and cheap. --- */
+  --e-1: 0 1px 2px rgb(20 18 30 / 0.05), 0 1px 1px rgb(20 18 30 / 0.03);
+  --e-2: 0 1px 3px rgb(20 18 30 / 0.06), 0 8px 16px -6px rgb(20 18 30 / 0.07);
+  --e-3: 0 2px 4px rgb(20 18 30 / 0.05), 0 16px 32px -12px rgb(20 18 30 / 0.14);
+  --e-focus: 0 0 0 3px color-mix(in srgb, var(--c-brand) 28%, transparent);
+
+  /* --- Type --- */
+  --f-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
+  --f-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', Consolas, monospace;
+
+  /* --- Radii --- */
+  --r-xs: 6px;
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-full: 999px;
+
+  /* --- Motion. Two curves: `out` for things entering, `spring` for things
+         that should feel physical (toasts, presses). --- */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+  --t-fast: 120ms;
+  --t-mid: 220ms;
+  --t-slow: 420ms;
+
+  --shell: 1240px;
+
+  color-scheme: light;
+  font-family: var(--f-sans);
+  font-size: 15px;
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-
-  @media (max-width: 1024px) {
-    font-size: 16px;
-  }
+  text-rendering: optimizeLegibility;
+  font-synthesis-weight: none;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
-  }
+:root[data-theme='dark'] {
+  --c-canvas: #101014;
+  --c-surface: #17171c;
+  --c-surface-2: #1c1c22;
+  --c-surface-3: #232329;
+  --c-line: #2a2a32;
+  --c-line-strong: #3a3a44;
 
-  #social .button-icon {
-    filter: invert(1) brightness(2);
-  }
+  --c-ink: #f4f4f6;
+  --c-ink-2: #b8b6c0;
+  --c-ink-3: #8b8996;
+  --c-ink-4: #64626e;
+
+  --c-brand: #818cf8;
+  --c-brand-hover: #a5b4fc;
+  --c-brand-soft: #21213a;
+  --c-brand-ink: #c7d2fe;
+
+  --c-warn: #fbbf24;
+  --c-warn-soft: #2e2415;
+  --c-info: #7ea6ff;
+  --c-info-soft: #16203a;
+  --c-ok: #4ade80;
+  --c-ok-soft: #14291d;
+  --c-danger: #f87171;
+  --c-danger-soft: #2e1a1a;
+
+  --e-1: 0 1px 2px rgb(0 0 0 / 0.4);
+  --e-2: 0 1px 3px rgb(0 0 0 / 0.5), 0 8px 16px -6px rgb(0 0 0 / 0.5);
+  --e-3: 0 2px 4px rgb(0 0 0 / 0.4), 0 16px 32px -12px rgb(0 0 0 / 0.7);
+
+  color-scheme: dark;
 }
 
-body {
-  margin: 0;
-}
+/* ==========================================================================
+   Reset
+   ========================================================================== */
 
-#root {
-  width: 1126px;
-  max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
-  min-height: 100svh;
-  display: flex;
-  flex-direction: column;
+*,
+*::before,
+*::after {
   box-sizing: border-box;
 }
 
-h1,
-h2 {
-  font-family: var(--heading);
-  font-weight: 500;
-  color: var(--text-h);
-}
-
-h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
-  }
-}
-h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
-  }
-}
-p {
+* {
   margin: 0;
 }
 
-code,
-.counter {
-  font-family: var(--mono);
-  display: inline-flex;
-  border-radius: 4px;
-  color: var(--text-h);
+html {
+  -webkit-text-size-adjust: 100%;
 }
 
-code {
+body {
+  min-height: 100dvh;
+  background: var(--c-canvas);
+  color: var(--c-ink-2);
+  overflow-x: hidden;
+}
+
+#root {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  isolation: isolate;
+}
+
+img,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  color: var(--c-ink);
+  font-weight: 620;
+  letter-spacing: -0.018em;
+  line-height: 1.22;
+  text-wrap: balance;
+}
+
+/* One consistent focus treatment everywhere. Keyboard users get a ring;
+   mouse users never see it. */
+:focus-visible {
+  outline: 2px solid var(--c-brand);
+  outline-offset: 2px;
+  border-radius: var(--r-xs);
+}
+
+::selection {
+  background: color-mix(in srgb, var(--c-brand) 24%, transparent);
+  color: var(--c-ink);
+}
+
+/* Scrollbars — Firefox first, then the WebKit variant. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--c-line-strong) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--c-line-strong);
+  border: 3px solid transparent;
+  background-clip: content-box;
+  border-radius: var(--r-full);
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--c-ink-4);
+  background-clip: content-box;
+}
+
+/* ==========================================================================
+   Motion primitives
+   ========================================================================== */
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(24px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes shimmer {
+  to {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes radar {
+  0% {
+    transform: scale(1);
+    opacity: 0.55;
+  }
+  70%,
+  100% {
+    transform: scale(2.6);
+    opacity: 0;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes indeterminate {
+  0% {
+    transform: translateX(-100%) scaleX(0.4);
+  }
+  50% {
+    transform: translateX(20%) scaleX(0.7);
+  }
+  100% {
+    transform: translateX(100%) scaleX(0.35);
+  }
+}
+
+/* `--i` is the stagger index; components set it inline per item. */
+.anim-rise {
+  animation: rise var(--t-slow) var(--ease-out) backwards;
+  animation-delay: calc(var(--i, 0) * 45ms);
+}
+
+.anim-fade {
+  animation: fade var(--t-mid) var(--ease-out) backwards;
+}
+
+/* Honour the OS setting. Nothing here is load-bearing, so it all just goes. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ==========================================================================
+   Layout
+   ========================================================================== */
+
+.shell {
+  width: 100%;
+  max-width: var(--shell);
+  margin-inline: auto;
+  padding-inline: 24px;
+}
+
+@media (max-width: 640px) {
+  .shell {
+    padding-inline: 16px;
+  }
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap, 16px);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--gap, 10px);
+}
+
+.spread {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+/* ==========================================================================
+   Typography helpers
+   ========================================================================== */
+
+.eyebrow {
+  font-size: 11px;
+  font-weight: 620;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--c-ink-3);
+}
+
+.muted {
+  color: var(--c-ink-3);
+}
+
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+.mono {
+  font-family: var(--f-mono);
+  font-size: 0.92em;
+  letter-spacing: -0.01em;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ==========================================================================
+   Buttons
+   ========================================================================== */
+
+.btn {
+  --btn-bg: var(--c-surface);
+  --btn-fg: var(--c-ink);
+  --btn-bd: var(--c-line-strong);
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 9px 15px;
+  border: 1px solid var(--btn-bd);
+  border-radius: var(--r-sm);
+  background: var(--btn-bg);
+  color: var(--btn-fg);
+  font-size: 14px;
+  font-weight: 550;
+  letter-spacing: -0.006em;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: var(--e-1);
+  transition:
+    background var(--t-fast) ease,
+    border-color var(--t-fast) ease,
+    box-shadow var(--t-fast) ease,
+    transform var(--t-fast) var(--ease-spring),
+    opacity var(--t-fast) ease;
+}
+
+.btn:hover:not(:disabled) {
+  background: var(--c-surface-3);
+  border-color: var(--c-ink-4);
+}
+
+/* Press feedback lives on :active — cheap, and it makes the UI feel physical. */
+.btn:active:not(:disabled) {
+  transform: translateY(1px) scale(0.985);
+  box-shadow: none;
+}
+
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.btn-primary {
+  --btn-bg: var(--c-brand);
+  --btn-fg: #fff;
+  --btn-bd: transparent;
+  box-shadow:
+    var(--e-2),
+    inset 0 1px 0 rgb(255 255 255 / 0.16);
+}
+.btn-primary:hover:not(:disabled) {
+  background: var(--c-brand-hover);
+  border-color: transparent;
+}
+
+:root[data-theme='dark'] .btn-primary {
+  --btn-fg: #14121f;
+}
+
+.btn-ghost {
+  --btn-bg: transparent;
+  --btn-bd: transparent;
+  --btn-fg: var(--c-ink-2);
+  box-shadow: none;
+}
+.btn-ghost:hover:not(:disabled) {
+  background: var(--c-surface-3);
+  border-color: transparent;
+  color: var(--c-ink);
+}
+
+.btn-lg {
+  padding: 13px 22px;
   font-size: 15px;
-  line-height: 135%;
-  padding: 4px 8px;
-  background: var(--code-bg);
+  border-radius: var(--r-md);
+}
+
+.btn-icon {
+  padding: 9px;
+  aspect-ratio: 1;
+}
+
+.btn .spin {
+  animation: spin 0.9s linear infinite;
+}
+
+/* ==========================================================================
+   Segmented tab control
+   ========================================================================== */
+
+.segmented {
+  position: relative;
+  display: inline-flex;
+  padding: 4px;
+  gap: 2px;
+  background: var(--c-surface-3);
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-md);
+}
+
+.segmented button {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 15px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--c-ink-3);
+  font-size: 14px;
+  font-weight: 550;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    color var(--t-fast) ease,
+    background var(--t-fast) ease;
+}
+
+.segmented button:hover {
+  color: var(--c-ink);
+}
+
+.segmented button[aria-selected='true'] {
+  color: var(--c-ink);
+  background: var(--c-surface);
+  box-shadow: var(--e-1);
+}
+
+/* ==========================================================================
+   Cards / panels
+   ========================================================================== */
+
+.card {
+  background: var(--c-surface);
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--e-1);
+}
+
+.card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--c-line);
+}
+
+.card-head h3 {
+  font-size: 15px;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.card-body {
+  padding: 20px;
+}
+
+/* ==========================================================================
+   Stat tiles
+   ========================================================================== */
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 14px;
+}
+
+.stat {
+  position: relative;
+  overflow: hidden;
+  padding: 16px 18px;
+  background: var(--c-surface);
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-md);
+  box-shadow: var(--e-1);
+  transition:
+    transform var(--t-mid) var(--ease-out),
+    box-shadow var(--t-mid) var(--ease-out),
+    border-color var(--t-mid) ease;
+}
+
+.stat:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--e-2);
+  border-color: var(--c-line-strong);
+}
+
+/* Accent rail keyed to the tile's semantic tone. */
+.stat::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: var(--tone, var(--c-brand));
+  transform: scaleY(0.25);
+  transform-origin: center;
+  transition: transform var(--t-slow) var(--ease-out);
+}
+
+.stat:hover::before {
+  transform: scaleY(1);
+}
+
+.stat-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.stat-icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--r-sm);
+  background: var(--tone-soft, var(--c-brand-soft));
+  color: var(--tone, var(--c-brand));
+}
+
+.stat-value {
+  font-size: 30px;
+  font-weight: 660;
+  letter-spacing: -0.035em;
+  color: var(--c-ink);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.stat-label {
+  margin-top: 7px;
+  font-size: 13px;
+  color: var(--c-ink-3);
+}
+
+/* ==========================================================================
+   Badges
+   ========================================================================== */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px 3px 7px;
+  border-radius: var(--r-full);
+  background: var(--tone-soft, var(--c-surface-3));
+  color: var(--tone, var(--c-ink-2));
+  font-size: 12px;
+  font-weight: 560;
+  line-height: 1.5;
+  white-space: nowrap;
+  border: 1px solid color-mix(in srgb, var(--tone, var(--c-ink-3)) 20%, transparent);
+}
+
+.badge .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex: none;
+}
+
+.badge-live .dot {
+  position: relative;
+}
+
+/* Pulsing halo for anything still in motion (pending / in-progress). */
+.badge-live .dot::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: currentColor;
+  animation: radar 2s var(--ease-out) infinite;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: var(--r-xs);
+  background: var(--c-surface-3);
+  border: 1px solid var(--c-line);
+  color: var(--c-ink-2);
+  font-size: 12px;
+  font-weight: 520;
+  white-space: nowrap;
+}
+
+/* ==========================================================================
+   Table
+   ========================================================================== */
+
+.table-scroll {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+
+table.data {
+  width: 100%;
+  /* Below this, cells wrap to one word per line. Scroll the container
+     instead — a squeezed table is harder to read than a scrolled one. */
+  min-width: 760px;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 13.5px;
+  text-align: left;
+}
+
+/* Seven columns don't fit a laptop viewport. Give them a floor and let the
+   container scroll instead of crushing every cell into two-word wraps. */
+table.data-wide {
+  min-width: 1180px;
+}
+
+table.data thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 10px 16px;
+  background: var(--c-surface-2);
+  border-bottom: 1px solid var(--c-line);
+  color: var(--c-ink-3);
+  font-size: 11px;
+  font-weight: 620;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+table.data tbody td {
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--c-line);
+  vertical-align: top;
+  color: var(--c-ink-2);
+}
+
+table.data tbody tr {
+  animation: rise var(--t-slow) var(--ease-out) backwards;
+  animation-delay: calc(var(--i, 0) * 35ms);
+  transition: background var(--t-fast) ease;
+}
+
+table.data tbody tr:hover {
+  background: var(--c-surface-2);
+}
+
+table.data tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+/* Accent rail slides in on hover — orients the eye across a wide row. */
+table.data tbody td:first-child {
+  position: relative;
+}
+
+table.data tbody td:first-child::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 2px;
+  background: var(--c-brand);
+  transform: scaleY(0);
+  transform-origin: top;
+  transition: transform var(--t-mid) var(--ease-out);
+}
+
+table.data tbody tr:hover td:first-child::before {
+  transform: scaleY(1);
+}
+
+.cell-title {
+  color: var(--c-ink);
+  font-weight: 570;
+  margin-bottom: 5px;
+  max-width: 34ch;
+}
+
+.cell-sub {
+  font-size: 12px;
+  color: var(--c-ink-3);
+  max-width: 40ch;
+}
+
+.thumb {
+  width: 84px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--c-line);
+  background: var(--c-surface-3);
+  cursor: zoom-in;
+  transition:
+    transform var(--t-mid) var(--ease-out),
+    box-shadow var(--t-mid) var(--ease-out);
+}
+
+.thumb:hover {
+  transform: scale(1.06);
+  box-shadow: var(--e-2);
+}
+
+/* Person cell — initials avatar + name/meta */
+.person {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.avatar {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--c-brand-soft);
+  color: var(--c-brand-ink);
+  font-size: 11px;
+  font-weight: 640;
+  letter-spacing: 0.01em;
+}
+
+/* ==========================================================================
+   Empty / skeleton states
+   ========================================================================== */
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 46px 24px;
+  text-align: center;
+  animation: fade var(--t-slow) var(--ease-out);
+}
+
+.empty-icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--r-md);
+  background: var(--c-surface-3);
+  color: var(--c-ink-4);
+}
+
+.empty h4 {
+  font-size: 14.5px;
+}
+
+.empty p {
+  font-size: 13px;
+  color: var(--c-ink-3);
+  max-width: 44ch;
+}
+
+.skeleton {
+  border-radius: var(--r-xs);
+  background: linear-gradient(
+      90deg,
+      var(--c-surface-3) 25%,
+      color-mix(in srgb, var(--c-surface-3) 55%, var(--c-surface)) 50%,
+      var(--c-surface-3) 75%
+    )
+    0 0 / 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+
+/* ==========================================================================
+   Forms
+   ========================================================================== */
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field label {
+  font-size: 13px;
+  font-weight: 550;
+  color: var(--c-ink);
+}
+
+/* Not scoped to .field label — section headings mark themselves required too. */
+.req {
+  color: var(--c-danger);
+  margin-left: 2px;
+}
+
+.input {
+  width: 100%;
+  padding: 10px 13px;
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-sm);
+  background: var(--c-surface);
+  color: var(--c-ink);
+  font-size: 14px;
+  transition:
+    border-color var(--t-fast) ease,
+    box-shadow var(--t-fast) ease,
+    background var(--t-fast) ease;
+}
+
+.input::placeholder {
+  color: var(--c-ink-4);
+}
+
+.input:hover:not(:disabled) {
+  border-color: var(--c-ink-4);
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--c-brand);
+  box-shadow: var(--e-focus);
+}
+
+textarea.input {
+  resize: vertical;
+  min-height: 88px;
+  line-height: 1.55;
+}
+
+select.input {
+  appearance: none;
+  cursor: pointer;
+  padding-right: 34px;
+  background-image: linear-gradient(45deg, transparent 50%, var(--c-ink-3) 50%),
+    linear-gradient(135deg, var(--c-ink-3) 50%, transparent 50%);
+  background-position:
+    calc(100% - 17px) calc(50% + 1px),
+    calc(100% - 12px) calc(50% + 1px);
+  background-size:
+    5px 5px,
+    5px 5px;
+  background-repeat: no-repeat;
+}
+
+.input-invalid,
+.input-invalid:hover {
+  border-color: var(--c-danger);
+}
+.input-invalid:focus {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--c-danger) 22%, transparent);
+}
+
+.field-error {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--c-danger);
+  animation: rise var(--t-mid) var(--ease-out);
+}
+
+.hint {
+  font-size: 12px;
+  color: var(--c-ink-3);
+}
+
+.grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+}
+
+@media (max-width: 760px) {
+  .grid-3,
+  .grid-2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* --- Numbered form section --- */
+
+.section {
+  display: grid;
+  grid-template-columns: 30px 1fr;
+  gap: 16px;
+}
+
+.section-num {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--c-surface-3);
+  border: 1px solid var(--c-line);
+  color: var(--c-ink-3);
+  font-size: 13px;
+  font-weight: 620;
+  font-variant-numeric: tabular-nums;
+  transition:
+    background var(--t-mid) ease,
+    color var(--t-mid) ease,
+    border-color var(--t-mid) ease;
+}
+
+.section-done .section-num {
+  background: var(--c-ok-soft);
+  border-color: color-mix(in srgb, var(--c-ok) 35%, transparent);
+  color: var(--c-ok);
+}
+
+.section h4 {
+  font-size: 14.5px;
+  margin-bottom: 2px;
+}
+
+@media (max-width: 640px) {
+  .section {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+}
+
+/* --- Dropzone --- */
+
+.dropzone {
+  position: relative;
+  display: grid;
+  place-items: center;
+  gap: 9px;
+  padding: 30px 20px;
+  text-align: center;
+  border: 1.5px dashed var(--c-line-strong);
+  border-radius: var(--r-md);
+  background: var(--c-surface-2);
+  cursor: pointer;
+  transition:
+    border-color var(--t-mid) ease,
+    background var(--t-mid) ease,
+    transform var(--t-mid) var(--ease-out);
+}
+
+.dropzone:hover,
+.dropzone:focus-within {
+  border-color: var(--c-brand);
+  background: var(--c-brand-soft);
+}
+
+.dropzone-active {
+  border-color: var(--c-brand);
+  background: var(--c-brand-soft);
+  transform: scale(1.01);
+}
+
+.dropzone input[type='file'] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.dropzone-icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--r-md);
+  background: var(--c-surface-3);
+  color: var(--c-ink-3);
+  transition:
+    transform var(--t-mid) var(--ease-spring),
+    color var(--t-mid) ease;
+}
+
+.dropzone:hover .dropzone-icon,
+.dropzone-active .dropzone-icon {
+  transform: translateY(-2px) scale(1.06);
+  color: var(--c-brand);
+}
+
+.preview {
+  display: flex;
+  gap: 14px;
+  padding: 12px;
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-md);
+  background: var(--c-surface-2);
+  animation: pop var(--t-slow) var(--ease-spring);
+}
+
+.preview img {
+  width: 108px;
+  height: 82px;
+  object-fit: cover;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--c-line);
+  flex: none;
+}
+
+/* --- GPS verification strip --- */
+
+.geo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 13px;
+  border-radius: var(--r-sm);
+  font-size: 13px;
+  border: 1px solid transparent;
+  animation: rise var(--t-mid) var(--ease-out);
+}
+
+.geo-pending {
+  background: var(--c-info-soft);
+  border-color: color-mix(in srgb, var(--c-info) 26%, transparent);
+  color: var(--c-info);
+}
+.geo-ok {
+  background: var(--c-ok-soft);
+  border-color: color-mix(in srgb, var(--c-ok) 30%, transparent);
+  color: var(--c-ok);
+}
+.geo-fail {
+  background: var(--c-danger-soft);
+  border-color: color-mix(in srgb, var(--c-danger) 28%, transparent);
+  color: var(--c-danger);
+}
+
+.ping {
+  position: relative;
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.ping::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: currentColor;
+  animation: radar 1.6s var(--ease-out) infinite;
+}
+
+/* ==========================================================================
+   App chrome
+   ========================================================================== */
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background: color-mix(in srgb, var(--c-surface) 82%, transparent);
+  backdrop-filter: saturate(180%) blur(14px);
+  -webkit-backdrop-filter: saturate(180%) blur(14px);
+  border-bottom: 1px solid var(--c-line);
+}
+
+.topbar-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  height: 62px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+}
+
+.brand-mark {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  border-radius: 10px;
+  background: linear-gradient(140deg, var(--c-brand), #7c3aed);
+  color: #fff;
+  box-shadow: var(--e-2);
+  transition: transform var(--t-mid) var(--ease-spring);
+}
+
+.brand:hover .brand-mark {
+  transform: rotate(-8deg) scale(1.06);
+}
+
+.brand-name {
+  font-size: 15.5px;
+  font-weight: 640;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+.brand-sub {
+  font-size: 11.5px;
+  color: var(--c-ink-3);
+  line-height: 1.2;
+}
+
+/* Indeterminate loading bar pinned under the topbar. */
+.progress {
+  position: absolute;
+  inset: auto 0 -1px 0;
+  height: 2px;
+  overflow: hidden;
+}
+
+.progress::after {
+  content: '';
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, var(--c-brand), transparent);
+  animation: indeterminate 1.15s ease-in-out infinite;
+}
+
+.page {
+  flex: 1;
+  padding: 28px 0 64px;
+}
+
+.page-enter {
+  animation: rise var(--t-slow) var(--ease-out);
+}
+
+.page-title {
+  font-size: 25px;
+  letter-spacing: -0.028em;
+}
+
+.page-lede {
+  margin-top: 6px;
+  font-size: 14px;
+  color: var(--c-ink-3);
+  max-width: 62ch;
+}
+
+.footer {
+  border-top: 1px solid var(--c-line);
+  padding: 18px 0;
+  font-size: 12.5px;
+  color: var(--c-ink-4);
+}
+
+/* ==========================================================================
+   Toasts
+   ========================================================================== */
+
+.toast-host {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 100;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  width: min(380px, calc(100vw - 40px));
+  padding: 13px 14px;
+  border: 1px solid var(--c-line);
+  border-left: 3px solid var(--tone, var(--c-brand));
+  border-radius: var(--r-md);
+  background: var(--c-surface);
+  box-shadow: var(--e-3);
+  pointer-events: auto;
+  animation: slide-in-right var(--t-slow) var(--ease-spring);
+}
+
+.toast-out {
+  animation: fade var(--t-mid) var(--ease-out) reverse forwards;
+}
+
+.toast-icon {
+  color: var(--tone, var(--c-brand));
+  flex: none;
+  margin-top: 1px;
+}
+
+.toast-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--c-ink);
+}
+
+.toast-msg {
+  margin-top: 2px;
+  font-size: 12.5px;
+  color: var(--c-ink-3);
+}
+
+@media (max-width: 640px) {
+  .toast-host {
+    right: 12px;
+    left: 12px;
+    bottom: 12px;
+  }
+  .toast {
+    width: auto;
+  }
+}
+
+/* ==========================================================================
+   Narrow viewports
+   ========================================================================== */
+
+@media (max-width: 860px) {
+  .brand-sub {
+    display: none !important;
+  }
+}
+
+/* Below this the tab labels stop fitting; the icons still carry the meaning,
+   so drop the text and keep the accessible name on the button. */
+@media (max-width: 620px) {
+  .tab-label {
+    display: none;
+  }
+
+  .segmented button {
+    padding: 8px 12px;
+  }
+
+  .topbar-inner {
+    height: auto;
+    padding-block: 12px;
+    flex-wrap: wrap;
+  }
+
+  .page-title {
+    font-size: 21px;
+  }
+
+  .card-body {
+    padding: 16px;
+  }
+
+  .stat-value {
+    font-size: 26px;
+  }
+}
+
+/* Search field is fixed-width for alignment on desktop; let it fill on mobile. */
+@media (max-width: 760px) {
+  input[type='search'].input {
+    width: 100% !important;
+  }
+
+  .spread > .row {
+    width: 100%;
+  }
+
+  .spread > .row > div:first-child {
+    flex: 1;
+  }
 }
