@@ -60,3 +60,16 @@ def create_complaint(data: Dict[Any, Any]):
             
     mock_complaints.append(new_entry)
     return {"status": "success", "data": new_entry}
+
+
+# --- ADMIN SECURITY VERIFICATION ---
+from fastapi import Header, HTTPException, status
+
+ADMIN_SECRET_KEY = "civicfix-admin-2026"
+
+def verify_admin_token(x_admin_key: str = Header(None)):
+    if x_admin_key != ADMIN_SECRET_KEY:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Unauthorized: Invalid or missing X-Admin-Key header."
+        )
