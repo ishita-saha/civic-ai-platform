@@ -7,11 +7,13 @@ import {
   Moon,
   ShieldCheck,
   Sun,
+  Images,
 } from 'lucide-react';
 import AdminDashboard from './components/AdminDashboard';
 import { AuthProvider } from './components/AuthProvider';
 import Landing from './components/Landing';
 import Login from './components/Login';
+import PastWork from './components/PastWork';
 import ReportForm from './components/ReportForm';
 import { ToastProvider } from './components/Toast';
 import { listComplaints, readableError } from './lib/api';
@@ -22,6 +24,7 @@ import { useToast } from './lib/toastContext';
 const TABS = [
   { id: 'home', label: 'Home', icon: Home },
   { id: 'report', label: 'Report an issue', icon: Megaphone },
+  { id: 'work', label: 'Past work', icon: Images },
   { id: 'admin', label: 'Dashboard', icon: LayoutDashboard },
 ];
 
@@ -180,11 +183,15 @@ function AppShell() {
             <Landing
               complaints={complaints}
               onReport={() => go('report')}
-              onDashboard={() => go('admin')}
+              // Sends citizens to the public before/after gallery, not the
+              // login-gated dashboard — a CTA shouldn't dead-end at a password.
+              onSeeWork={() => go('work')}
             />
           )}
 
           {tab === 'report' && <ReportForm onSubmitted={load} />}
+
+          {tab === 'work' && <PastWork complaints={complaints} loading={loading} />}
 
           {/* The dashboard exposes reporters' names and phone numbers, so it
               only renders for a signed-in staff session. */}

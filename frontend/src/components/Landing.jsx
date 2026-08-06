@@ -1,4 +1,5 @@
-import { ArrowRight, Camera, CircleDashed, MapPin, ShieldCheck } from 'lucide-react';
+import { ArrowRight, Camera, MapPin, ShieldCheck } from 'lucide-react';
+import BeforeAfter from './BeforeAfter';
 import { demoResolved } from '../lib/demoData';
 import { statusOf } from '../lib/format';
 
@@ -25,26 +26,7 @@ const PIPELINE = [
   },
 ];
 
-const GAPS = [
-  {
-    title: 'No notifications yet.',
-    body: 'You get a reference number on screen, but nothing is sent to your phone. Wiring that up is the next job.',
-  },
-  {
-    title: "Duplicates aren't merged.",
-    body: 'Four people reporting the same pothole still creates four cases. Clustering nearby reports is designed but not built.',
-  },
-  {
-    title: "You can't track your own case yet.",
-    body: 'Citizens have no login. Everything is visible on the dashboard, but there is no "my reports" view.',
-  },
-  {
-    title: 'Reports are held in memory.',
-    body: 'This is a pilot build. Restarting the API clears everything — the Postgres schema exists but is not connected yet.',
-  },
-];
-
-export default function Landing({ complaints, onReport, onDashboard }) {
+export default function Landing({ complaints, onReport, onSeeWork }) {
   const resolvedCount = complaints.filter((c) => statusOf(c) === 'resolved').length || demoResolved.length;
   const example = demoResolved[0];
 
@@ -69,7 +51,7 @@ export default function Landing({ complaints, onReport, onDashboard }) {
             <Camera size={17} aria-hidden="true" />
             Report an issue
           </button>
-          <button type="button" className="btn btn-lg" onClick={onDashboard}>
+          <button type="button" className="btn btn-lg" onClick={onSeeWork}>
             See what&rsquo;s been fixed
             <ArrowRight size={16} aria-hidden="true" />
           </button>
@@ -141,13 +123,24 @@ export default function Landing({ complaints, onReport, onDashboard }) {
         </div>
 
         <div className="case-study">
-          <img src={example.completed_photo} alt="Replaced streetlight on Park Avenue, after work" />
+          <div style={{ padding: 14 }}>
+            <BeforeAfter item={example} />
+          </div>
           <div className="case-study-body stack" style={{ '--gap': '12px' }}>
             <div>
               <span className="mono hint">#{example.id}</span>
               <h4 style={{ fontSize: 16, margin: '4px 0 6px' }}>{example.title}</h4>
               <p className="hint" style={{ lineHeight: 1.6 }}>
                 {example.description}
+              </p>
+            </div>
+
+            <div className="stack" style={{ '--gap': '4px' }}>
+              <p className="ba-note" style={{ margin: 0 }}>
+                <b style={{ color: 'var(--c-ink-2)' }}>Reported:</b> {example.before_note}
+              </p>
+              <p className="ba-note" style={{ margin: 0 }}>
+                <b style={{ color: 'var(--c-ink-2)' }}>Done:</b> {example.after_note}
               </p>
             </div>
 
@@ -166,30 +159,6 @@ export default function Landing({ complaints, onReport, onDashboard }) {
               Handled by {example.department} · {example.officer_assigned}
             </p>
           </div>
-        </div>
-      </section>
-
-      {/* ---- Honest gaps. Every pilot has them; hiding them just means
-             someone discovers them at a worse moment. ---- */}
-      <section className="band">
-        <div className="band-head">
-          <span className="eyebrow">Straight answers</span>
-          <h2>What this doesn&rsquo;t do yet</h2>
-          <p>
-            It&rsquo;s a pilot, and pretending otherwise wastes your time. Here is what is genuinely
-            missing today.
-          </p>
-        </div>
-
-        <div className="gaps">
-          {GAPS.map((g) => (
-            <div className="gap" key={g.title}>
-              <CircleDashed size={15} aria-hidden="true" />
-              <span>
-                <b>{g.title}</b> {g.body}
-              </span>
-            </div>
-          ))}
         </div>
       </section>
 
