@@ -200,8 +200,8 @@ export default function ReportForm({ onSubmitted }) {
 
           <h2 style={{ fontSize: 20 }}>Thanks — that&rsquo;s logged.</h2>
           <p className="page-lede" style={{ margin: '0 auto' }}>
-            “{receipt.title}” is with the triage desk. You&rsquo;ll get an SMS on the number you gave
-            us when a department picks it up.
+            “{receipt.title}” is sitting with the triage desk. Hang on to the reference below —
+            there are no SMS alerts yet, so it&rsquo;s how you find your case on the dashboard.
           </p>
 
           {receipt.id != null && (

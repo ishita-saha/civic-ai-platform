@@ -1,12 +1,26 @@
 import { useCallback, useEffect, useState } from 'react';
-import { LayoutDashboard, Megaphone, Moon, ShieldCheck, Sun } from 'lucide-react';
+import {
+  Home,
+  LayoutDashboard,
+  LogOut,
+  Megaphone,
+  Moon,
+  ShieldCheck,
+  Sun,
+} from 'lucide-react';
 import AdminDashboard from './components/AdminDashboard';
+import { AuthProvider } from './components/AuthProvider';
+import Landing from './components/Landing';
+import Login from './components/Login';
 import ReportForm from './components/ReportForm';
 import { ToastProvider } from './components/Toast';
 import { listComplaints, readableError } from './lib/api';
+import { useAuth } from './lib/authContext';
+import { initials } from './lib/format';
 import { useToast } from './lib/toastContext';
 
 const TABS = [
+  { id: 'home', label: 'Home', icon: Home },
   { id: 'report', label: 'Report an issue', icon: Megaphone },
   { id: 'admin', label: 'Dashboard', icon: LayoutDashboard },
 ];
@@ -14,7 +28,7 @@ const TABS = [
 /** Tab lives in the URL hash so refresh and the back button both behave. */
 function tabFromHash() {
   const id = window.location.hash.replace('#', '');
-  return TABS.some((t) => t.id === id) ? id : 'admin';
+  return TABS.some((t) => t.id === id) ? id : 'home';
 }
 
 function useTheme() {
@@ -34,6 +48,7 @@ function useTheme() {
 
 function AppShell() {
   const toast = useToast();
+  const { user, signOut } = useAuth();
   const [theme, toggleTheme] = useTheme();
   const [tab, setTab] = useState(tabFromHash);
   const [complaints, setComplaints] = useState([]);
@@ -49,6 +64,7 @@ function AppShell() {
   const go = (id) => {
     window.location.hash = id;
     setTab(id);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const load = useCallback(
@@ -71,11 +87,23 @@ function AppShell() {
     load();
   }, [load]);
 
+  const handleSignOut = () => {
+    signOut();
+    toast.info('Signed out', 'The dashboard is locked again.');
+    go('home');
+  };
+
   return (
     <>
       <header className="topbar">
         <div className="shell topbar-inner">
-          <div className="brand">
+          <button
+            type="button"
+            className="brand"
+            onClick={() => go('home')}
+            style={{ background: 'none', border: 0, padding: 0, cursor: 'pointer', textAlign: 'left' }}
+            aria-label="CivicFix home"
+          >
             <span className="brand-mark">
               <ShieldCheck size={18} aria-hidden="true" />
             </span>
@@ -85,7 +113,7 @@ function AppShell() {
                 Geo-verified civic reporting
               </span>
             </span>
-          </div>
+          </button>
 
           <div className="row" style={{ '--gap': '10px' }}>
             <div className="segmented" role="tablist" aria-label="Sections">
@@ -106,6 +134,31 @@ function AppShell() {
               ))}
             </div>
 
+            {user && (
+              <div className="whoami">
+                <span className="avatar" aria-hidden="true">
+                  {initials(user.name)}
+                </span>
+                <span className="whoami-text" style={{ minWidth: 0, lineHeight: 1.2 }}>
+                  <span style={{ display: 'block', fontSize: 13, fontWeight: 560, color: 'var(--c-ink)' }}>
+                    {user.name}
+                  </span>
+                  <span className="hint" style={{ fontSize: 11 }}>
+                    {user.department}
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-icon"
+                  onClick={handleSignOut}
+                  aria-label="Sign out"
+                  title="Sign out"
+                >
+                  <LogOut size={15} />
+                </button>
+              </div>
+            )}
+
             <button
               type="button"
               className="btn btn-ghost btn-icon"
@@ -123,16 +176,29 @@ function AppShell() {
 
       <main className="page">
         <div className="shell">
-          {tab === 'admin' ? (
-            <AdminDashboard
+          {tab === 'home' && (
+            <Landing
               complaints={complaints}
-              loading={loading}
-              onRefresh={() => load({ announce: true })}
-              lastUpdated={lastUpdated}
+              onReport={() => go('report')}
+              onDashboard={() => go('admin')}
             />
-          ) : (
-            <ReportForm onSubmitted={load} />
           )}
+
+          {tab === 'report' && <ReportForm onSubmitted={load} />}
+
+          {/* The dashboard exposes reporters' names and phone numbers, so it
+              only renders for a signed-in staff session. */}
+          {tab === 'admin' &&
+            (user ? (
+              <AdminDashboard
+                complaints={complaints}
+                loading={loading}
+                onRefresh={() => load({ announce: true })}
+                lastUpdated={lastUpdated}
+              />
+            ) : (
+              <Login onSignedIn={() => toast.success('Signed in', 'Welcome back.')} />
+            ))}
         </div>
       </main>
 
@@ -148,8 +214,10 @@ function AppShell() {
 
 export default function App() {
   return (
-    <ToastProvider>
-      <AppShell />
-    </ToastProvider>
+    <AuthProvider>
+      <ToastProvider>
+        <AppShell />
+      </ToastProvider>
+    </AuthProvider>
   );
 }

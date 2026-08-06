@@ -48,6 +48,30 @@ export function when(value) {
   });
 }
 
+/**
+ * How long a case has been sitting, in words. "Filed 3 days ago" tells a
+ * triage desk more at a glance than a timestamp does.
+ */
+export function ago(value) {
+  if (!value) return null;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+
+  const mins = Math.floor((Date.now() - d.getTime()) / 60000);
+  if (mins < 0) return null; // clock skew — say nothing rather than "in -2 days"
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins} min ago`;
+
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours} hr${hours === 1 ? '' : 's'} ago`;
+
+  const days = Math.floor(hours / 24);
+  if (days < 31) return `${days} day${days === 1 ? '' : 's'} ago`;
+
+  const months = Math.floor(days / 30);
+  return `${months} mo ago`;
+}
+
 /** Buckets a free-text status into one of our three semantic lanes. */
 export function statusOf(item) {
   const s = String(item?.status || '').toLowerCase();

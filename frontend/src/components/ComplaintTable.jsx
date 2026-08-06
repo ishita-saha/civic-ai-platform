@@ -1,6 +1,6 @@
 import { MapPin, ExternalLink, ImageOff } from 'lucide-react';
 import StatusBadge from './StatusBadge';
-import { caseId, coords, initials, mapsUrl, placeName, statusOf, when } from '../lib/format';
+import { ago, caseId, coords, initials, mapsUrl, placeName, statusOf, when } from '../lib/format';
 
 function SkeletonRows({ cols }) {
   return Array.from({ length: 3 }, (_, r) => (
@@ -50,6 +50,7 @@ export default function ComplaintTable({ items, showResolutionColumns = false, l
               // location string too — don't print the same numbers twice.
               const place = placeName(item);
               const placeIsCoords = !!gps && place.replace(/\s/g, '') === gps.replace(/\s/g, '');
+              const filed = ago(item.timestamp || item.created_at);
 
               return (
                 <tr key={caseId(item, i)} style={{ '--i': i }}>
@@ -61,6 +62,13 @@ export default function ComplaintTable({ items, showResolutionColumns = false, l
                       {when(item.timestamp || item.created_at)}
                     </div>
                     <StatusBadge status={statusOf(item)} />
+                    {/* Age matters while a case is still open; once it's closed
+                        the resolution date is the interesting number. */}
+                    {statusOf(item) !== 'resolved' && filed && (
+                      <div className="cell-sub" style={{ marginTop: 6 }}>
+                        open {filed.replace(' ago', '')}
+                      </div>
+                    )}
                   </td>
 
                   <td>
