@@ -1,4 +1,5 @@
-import { MapPin, ExternalLink, ImageOff } from 'lucide-react';
+import { MapPin, ExternalLink } from 'lucide-react';
+import BeforeAfter from './BeforeAfter';
 import StatusBadge from './StatusBadge';
 import { ago, caseId, coords, initials, mapsUrl, placeName, statusOf, when } from '../lib/format';
 
@@ -26,7 +27,7 @@ export default function ComplaintTable({ items, showResolutionColumns = false, l
             <th scope="col">Issue</th>
             <th scope="col">Location</th>
             <th scope="col">Assigned to</th>
-            {showResolutionColumns && <th scope="col">Completed work</th>}
+            {showResolutionColumns && <th scope="col">Before / after</th>}
             {showResolutionColumns && <th scope="col">Verified by</th>}
             <th scope="col">Reported by</th>
           </tr>
@@ -134,20 +135,7 @@ export default function ComplaintTable({ items, showResolutionColumns = false, l
 
                   {showResolutionColumns && (
                     <td>
-                      {item.completed_photo ? (
-                        <a href={item.completed_photo} target="_blank" rel="noreferrer">
-                          <img
-                            className="thumb"
-                            src={item.completed_photo}
-                            alt={`Completed work for ${item.title || 'this case'}`}
-                            loading="lazy"
-                          />
-                        </a>
-                      ) : (
-                        <span className="row cell-sub" style={{ '--gap': '5px' }}>
-                          <ImageOff size={13} aria-hidden="true" /> No photo
-                        </span>
-                      )}
+                      <BeforeAfter item={item} size="mini" />
                     </td>
                   )}
 

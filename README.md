@@ -17,8 +17,11 @@ crews lost half-days driving out to find three big trees and no pothole.
   verification, and a reference number on submit.
 - **Staff dashboard** — every case bucketed into awaiting triage / in progress /
   resolved, with search across all fields and how long each case has been open.
-- **Closed cases carry proof** — the field photo and the named inspector who
-  signed it off, both visible.
+- **Closed cases carry proof** — a before/after pair showing how the place
+  looked when it was reported and how it looked when the crew finished, plus the
+  named inspector who signed it off.
+- **A public "Past work" gallery** — every finished job, before and after, with
+  no reporter names or phone numbers attached.
 - **Light and dark themes**, keyboard navigation, reduced-motion support, and a
   layout that survives a phone screen.
 
@@ -123,8 +126,15 @@ Steps 1–4 are what make this deployable. Step 5 is what makes it clever. Doing
 
 ## A note on the demo data
 
-The two resolved cases on the dashboard and the homepage — the Park Avenue
-streetlight and the Central Market resurfacing — are fabricated, along with
-their inspectors and employee IDs. They're there so the resolved lane isn't
-empty on a fresh install. Real resolved cases replace them automatically as soon
-as the backend returns any. See `frontend/src/lib/demoData.js`.
+The two resolved cases — the Park Avenue streetlight and the Central Market
+resurfacing — are fabricated, along with their inspectors and employee IDs.
+They're there so the resolved lane isn't empty on a fresh install. Real cases
+replace them automatically as soon as the backend returns any. See
+`frontend/src/lib/demoData.js`.
+
+Their before/after images are **generated placeholders stamped `TEST`**, not
+photographs. They used to be stock photos, which meant a picture of a chrome tap
+sat in the evidence column of a streetlight repair. An image that contradicts
+its caption teaches people to distrust the whole column — and that column is the
+entire point of the product. Better an obvious placeholder than a convincing
+lie. See `frontend/src/lib/placeholder.js`.

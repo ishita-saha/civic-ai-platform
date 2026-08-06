@@ -40,6 +40,7 @@ Read this before you trust anything else.
 | Postgres schema (`models.py`) | **Orphaned.** Correct-looking, never imported by `main.py`. |
 | Supabase | **Configured, unused.** Keys sit in `backend/.env`; no code calls it. |
 | Photo upload | **Filename only.** The image bytes never leave the browser. |
+| Before/after evidence | **UI complete, no real photos.** Demo cases use generated TEST placeholders. |
 | Duplicate clustering (DBSCAN) | **Not built.** |
 | AI vision classification | **Not built.** `priority_score` is hardcoded to `85`. |
 | RAG / SLA routing | **Not built.** Department is derived from the category string. |
@@ -59,8 +60,10 @@ src/
   components/
     Landing.jsx          public homepage
     ReportForm.jsx       citizen submission flow
+    PastWork.jsx         public before/after gallery of closed cases
     AdminDashboard.jsx   staff view — stats, search, three lanes
     ComplaintTable.jsx   the table itself
+    BeforeAfter.jsx      the before/after pair, table- and gallery-sized
     Login.jsx            staff sign-in screen
     AuthProvider.jsx     session state
     Toast.jsx            notification host
@@ -68,7 +71,8 @@ src/
   lib/
     api.js               axios client + error flattening
     format.js            dates, coordinates, initials, status bucketing
-    demoData.js          stand-in resolved cases, category list
+    demoData.js          stand-in resolved cases, category list, photoPair()
+    placeholder.js       generated TEST placeholder art (SVG data URIs)
     authContext.js       context + useAuth
     toastContext.js      context + useToast
 ```
@@ -85,10 +89,10 @@ component lives in `components/`. A module that exports both a component and a
 hook loses its React Fast Refresh boundary and forces a full page reload on
 every edit. Two files, no reloads.
 
-**Routing** is the URL hash (`#home`, `#report`, `#admin`), read on load and on
-`hashchange`. Deliberately not React Router — three views did not justify the
-dependency. If a fourth view arrives with real URL params, swap it; `react-router-dom`
-is already in `package.json`.
+**Routing** is the URL hash (`#home`, `#report`, `#work`, `#admin`), read on load
+and on `hashchange`. Deliberately not React Router — four flat views did not
+justify the dependency. The moment one needs a URL parameter (`#case/SOLV-892`),
+swap it; `react-router-dom` is already in `package.json`.
 
 **Animation** is CSS-only. Two easing curves (`--ease-out`, `--ease-spring`) and
 a handful of keyframes. Staggered entrances use a `--i` index set inline per
@@ -139,6 +143,32 @@ is forgiving of the backend's inconsistency and will quietly mis-bucket anything
 unexpected. An enum on both sides would be better.
 
 ---
+
+## Evidence photos
+
+A closed case is supposed to rest on two images: the place as reported, and the
+place once the crew finished. `BeforeAfter.jsx` renders that pair everywhere it
+appears — the homepage case study, the `#work` gallery, and the resolved lane of
+the staff table — at two sizes, `mini` and `full`.
+
+The two shapes it has to absorb are reconciled in one place, `photoPair()` in
+`demoData.js`: demo records carry `before_photo` / `after_photo`, while a
+backend that only ever stored one image exposes `completed_photo`. That single
+field maps to the *after* pane, and the before pane renders "Not on file"
+rather than silently disappearing — a missing before-photo is information, not
+an empty cell.
+
+**The demo images are generated, not photographed.** `placeholder.js` builds SVG
+data URIs stamped `TEST` and `not a real photograph`. This replaced stock
+photos of unrelated subjects — a chrome tap illustrating a streetlight repair.
+A picture that contradicts its caption trains people to distrust the evidence
+column, which is the one column this product exists to make trustworthy. If you
+wire up real uploads, drop the `testPhoto()` calls from `demoData.js`; nothing
+else needs to change.
+
+**The `#work` gallery is public and shows no complainant details** — no name, no
+phone number — unlike the staff dashboard. Who reported a pothole is nobody's
+business; whether it was fixed is everybody's. Keep that split if you extend it.
 
 ## Auth
 
