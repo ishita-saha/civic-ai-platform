@@ -162,105 +162,90 @@ export default function App() {
   };
 
   // Filter complaints by status
-  const pendingComplaints = complaints.filter(c => (c.status || 'Pending').toLowerCase() === 'pending');
-  const inProgressComplaints = complaints.filter(c => (c.status || '').toLowerCase() === 'in progress');
-  
-  // Combine server solved cases with demo solved cases
-  const fetchedSolved = complaints.filter(c => ['resolved', 'completed', 'solved'].includes((c.status || '').toLowerCase()));
-  const resolvedComplaints = fetchedSolved.length > 0 ? fetchedSolved : mockSolvedCases;
+  const pendingComplaints = complaints.filter(c => typeof c.status === 'string' && c.status.toLowerCase().includes('pending'));
+  const inProgressComplaints = complaints.filter(c => typeof c.status === 'string' && c.status.toLowerCase().includes('progress'));
+  const resolvedComplaints = complaints.filter(c => typeof c.status === 'string' && /(resolved|completed|solved)/i.test(c.status));
+  const solvedComplaints = resolvedComplaints.length > 0 ? resolvedComplaints : mockSolvedCases;
 
   // Render Table Function
-  const renderTable = (items, headerBgColor, isSolvedTable = false) => {
+  const renderTable = (items, isSolvedTable = false) => {
     if (items.length === 0) {
-      return <p style={{ padding: '12px', color: '#666', fontStyle: 'italic', fontSize: '14px' }}>No complaints under this status.</p>;
+      return (
+        <div style={{ padding: '22px', color: '#6a665f', fontStyle: 'italic', fontSize: '14px', textAlign: 'center' }}>
+          No complaints available for this category.
+        </div>
+      );
     }
 
     return (
-      <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '10px', fontSize: '13px', textAlign: 'left' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '12px', fontSize: '14px', textAlign: 'left' }}>
         <thead>
-          <tr style={{ backgroundColor: headerBgColor, color: '#fff' }}>
+          <tr style={{ backgroundColor: '#605950', color: '#f4f1ec' }}>
             <th style={thStyle}>ID / Date</th>
             <th style={thStyle}>Issue & Category</th>
-            <th style={thStyle}>Location (Geotagged)</th>
-            <th style={thStyle}>Department Assigned</th>
-            <th style={thStyle}>Officer / In-Charge</th>
-            {isSolvedTable && <th style={thStyle}>Completed Work Photo</th>}
-            {isSolvedTable && <th style={thStyle}>Work Reviewer Details</th>}
-            <th style={thStyle}>Complainant Details</th>
+            <th style={thStyle}>Location</th>
+            <th style={thStyle}>Department</th>
+            <th style={thStyle}>Officer</th>
+            {isSolvedTable && <th style={thStyle}>Completed Work</th>}
+            {isSolvedTable && <th style={thStyle}>Reviewer</th>}
+            <th style={thStyle}>Complainant</th>
           </tr>
         </thead>
         <tbody>
           {items.map((item, idx) => {
             const department = item.department || `${item.category || 'Municipal'} Dept`;
-            const officer = item.officer_assigned || item.assigned_officer || null;
+            const officer = item.officer_assigned || item.assigned_officer || 'Unassigned';
             const reviewerObj = item.reviewer || {
-              name: item.reviewer_name || 'Dr. Ananya Sen',
-              designation: 'Chief Quality Audit Officer',
-              emp_id: 'AUD-KMC-904'
+              name: item.reviewer_name || 'Inspector Team',
+              designation: 'Quality Review',
+              emp_id: 'N/A'
             };
 
             return (
-              <tr key={item.id || idx} style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: idx % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
+              <tr key={item.id || idx} style={{ borderBottom: '1px solid #e7e2db', backgroundColor: idx % 2 === 0 ? '#ffffff' : '#f9f7f3' }}>
                 <td style={tdStyle}>
-                  <strong>#{item.id || `CMP-${idx + 101}`}</strong><br/>
-                  <span style={{ fontSize: '11px', color: '#64748b' }}>{item.timestamp || '2026-04-01'}</span>
+                  <div style={{ fontWeight: '700', color: '#3c3731' }}>#{item.id || `CMP-${idx + 101}`}</div>
+                  <div style={{ fontSize: '11px', color: '#807a71' }}>{item.timestamp || '2026-04-01'}</div>
                 </td>
-                
+
                 <td style={tdStyle}>
-                  <strong style={{ color: '#0f172a' }}>{item.title}</strong>
-                  <div style={{ marginTop: '4px' }}>
-                    <span style={{ backgroundColor: '#e2e8f0', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold', fontSize: '11px', color: '#334155' }}>
-                      {item.category || 'General'}
-                    </span>
+                  <div style={{ fontWeight: '700', color: '#312c27', marginBottom: '4px' }}>{item.title}</div>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <span style={{ padding: '5px 10px', backgroundColor: '#ece7df', borderRadius: '999px', fontSize: '12px', color: '#5e554d' }}>{item.category || 'General'}</span>
                   </div>
-                  {item.description && <div style={{ fontSize: '12px', color: '#475569', marginTop: '4px' }}>{item.description}</div>}
+                  {item.description && <div style={{ marginTop: '8px', fontSize: '12px', color: '#6b655d' }}>{item.description}</div>}
                 </td>
 
-                <td style={tdStyle}>📍 {formatLocation(item)}</td>
+                <td style={tdStyle}>{formatLocation(item)}</td>
 
-                {/* Department Column */}
+                <td style={tdStyle}>{department}</td>
+
                 <td style={tdStyle}>
-                  <span style={{ fontWeight: '600', color: '#1e3a8a' }}>🏛️ {department}</span>
+                  <span style={{ display: 'inline-block', backgroundColor: '#f0ece6', color: '#51473f', padding: '6px 10px', borderRadius: '999px', fontSize: '12px' }}>
+                    {officer}
+                  </span>
                 </td>
 
-                {/* Officer / In-Charge Column */}
-                <td style={tdStyle}>
-                  {officer ? (
-                    <span style={{ backgroundColor: '#dcfce7', color: '#166534', padding: '3px 8px', borderRadius: '4px', fontWeight: 'bold', fontSize: '12px', display: 'inline-block' }}>
-                      👮‍♂️ {officer}
-                    </span>
-                  ) : (
-                    <span style={{ backgroundColor: '#fee2e2', color: '#991b1b', padding: '3px 8px', borderRadius: '4px', fontWeight: 'bold', fontSize: '12px', display: 'inline-block' }}>
-                      ⚠️ Not Assigned
-                    </span>
-                  )}
-                </td>
-
-                {/* Completed Work Photo Column (Solved Table Only) */}
                 {isSolvedTable && (
                   <td style={tdStyle}>
                     {item.completed_photo ? (
-                      <div>
-                        <img 
-                          src={item.completed_photo} 
-                          alt="Work Completed" 
-                          style={{ width: '80px', height: '60px', objectFit: 'cover', borderRadius: '6px', border: '1px solid #cbd5e1' }} 
-                        />
-                        <div style={{ fontSize: '10px', color: '#16a34a', fontWeight: 'bold', marginTop: '2px' }}>AI / GPS Verified</div>
-                      </div>
+                      <img
+                        src={item.completed_photo}
+                        alt="Completed work"
+                        style={{ width: '88px', height: '60px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #ddd5ca' }}
+                      />
                     ) : (
-                      <span style={{ fontSize: '11px', color: '#94a3b8' }}>No photo attached</span>
+                      <span style={{ color: '#8b847d', fontSize: '12px' }}>No image</span>
                     )}
                   </td>
                 )}
 
-                {/* Work Reviewer Column (Solved Table Only) */}
                 {isSolvedTable && (
                   <td style={tdStyle}>
-                    <div style={{ backgroundColor: '#f0fdf4', padding: '8px', borderRadius: '6px', border: '1px solid #bbf7d0' }}>
-                      <div style={{ fontWeight: 'bold', color: '#14532d', fontSize: '12px' }}>🔍 {reviewerObj.name}</div>
-                      <div style={{ fontSize: '11px', color: '#166534', marginTop: '2px' }}>{reviewerObj.designation}</div>
-                      <div style={{ fontSize: '10px', color: '#4b5563', marginTop: '2px' }}>ID: {reviewerObj.emp_id}</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', color: '#4a443d' }}>
+                      <span style={{ fontWeight: '700' }}>{reviewerObj.name}</span>
+                      <span style={{ fontSize: '12px', color: '#6a645e' }}>{reviewerObj.designation}</span>
+                      <span style={{ fontSize: '11px', color: '#7f7a74' }}>ID: {reviewerObj.emp_id}</span>
                     </div>
                   </td>
                 )}
@@ -268,11 +253,11 @@ export default function App() {
                 <td style={tdStyle}>
                   {item.complainant?.fullName ? (
                     <div>
-                      <div><strong>{item.complainant.fullName}</strong></div>
-                      <div style={{ fontSize: '11px', color: '#64748b' }}>📞 {item.complainant.phone}</div>
+                      <div style={{ fontWeight: '700', color: '#3c3731' }}>{item.complainant.fullName}</div>
+                      <div style={{ fontSize: '12px', color: '#7f786f' }}>{item.complainant.phone}</div>
                     </div>
                   ) : (
-                    <span style={{ color: '#94a3b8', fontSize: '12px' }}>Anonymous / Legacy</span>
+                    <span style={{ color: '#8b847d', fontSize: '12px' }}>Not provided</span>
                   )}
                 </td>
               </tr>
@@ -284,25 +269,25 @@ export default function App() {
   };
 
   return (
-    <div style={{ fontFamily: 'Segoe UI, Tahoma, Geneva, Verdana, sans-serif', backgroundColor: '#f1f5f9', minHeight: '100vh', paddingBottom: '40px' }}>
+    <div style={{ fontFamily: 'Segoe UI, Tahoma, Geneva, Verdana, sans-serif', backgroundColor: '#f5f4f2', minHeight: '100vh', paddingBottom: '40px' }}>
       
       {/* Top Header */}
-      <header style={{ backgroundColor: '#1e3a8a', color: '#ffffff', padding: '16px 24px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-        <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <header style={{ backgroundColor: '#3b3a38', color: '#f8f7f3', padding: '18px 24px', boxShadow: '0 10px 30px rgba(0,0,0,0.08)' }}>
+        <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px' }}>
           <div>
-            <h1 style={{ margin: 0, fontSize: '22px' }}>CivicFix AI Platform</h1>
-            <p style={{ margin: 0, fontSize: '12px', color: '#93c5fd' }}>Verified Citizen & Admin Dashboard</p>
+            <h1 style={{ margin: 0, fontSize: '22px', letterSpacing: '0.15px' }}>CivicFix AI Platform</h1>
+            <p style={{ margin: 0, fontSize: '13px', color: '#d7d5d0' }}>Verified Citizen & Admin Dashboard</p>
           </div>
-          <div>
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
             <button 
               onClick={() => setActiveTab('report')}
-              style={{ ...tabBtnStyle, backgroundColor: activeTab === 'report' ? '#2563eb' : '#1e293b' }}
+              style={{ ...tabBtnStyle, backgroundColor: activeTab === 'report' ? '#d8d4cd' : '#ede9e2', color: activeTab === 'report' ? '#2f2a26' : '#6f6b67' }}
             >
-              Public Portal
+              Citizen Portal
             </button>
             <button 
               onClick={() => setActiveTab('admin')}
-              style={{ ...tabBtnStyle, backgroundColor: activeTab === 'admin' ? '#2563eb' : '#1e293b', marginLeft: '8px' }}
+              style={{ ...tabBtnStyle, backgroundColor: activeTab === 'admin' ? '#d8d4cd' : '#ede9e2', color: activeTab === 'admin' ? '#2f2a26' : '#6f6b67' }}
             >
               Admin Dashboard ({complaints.length + mockSolvedCases.length})
             </button>
@@ -315,20 +300,20 @@ export default function App() {
         {/* ADMIN TAB */}
         {activeTab === 'admin' && (
           <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '18px', marginBottom: '22px', flexWrap: 'wrap' }}>
               <div>
-                <h2 style={{ margin: 0, color: '#0f172a' }}>Admin Submissions & Verification Dashboard</h2>
-                <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>Real-time department assignment, officer allocation, and post-resolution inspection audits.</p>
+                <h2 style={{ margin: 0, color: '#2e2a27' }}>Admin Submissions Dashboard</h2>
+                <p style={{ margin: '8px 0 0 0', fontSize: '13px', color: '#6f6b67' }}>Review complaints by current status and track response progress.</p>
               </div>
-              <button onClick={fetchComplaints} style={{ padding: '8px 14px', backgroundColor: '#e2e8f0', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>
-                🔄 Refresh Database
+              <button onClick={fetchComplaints} style={{ padding: '10px 18px', backgroundColor: '#ede9e2', color: '#2f2a26', border: '1px solid #d6d1ca', borderRadius: '12px', cursor: 'pointer', fontWeight: '700' }}>
+                Refresh Data
               </button>
             </div>
 
             {/* TABLE 1: PENDING COMPLAINTS */}
             <div style={cardStyle}>
               <div style={cardHeaderStyle}>
-                <h3 style={{ margin: 0, color: '#b45309' }}>⏳ Pending Complaints ({pendingComplaints.length})</h3>
+                <h3 style={{ margin: 0, color: '#3b3732' }}>Pending Complaints ({pendingComplaints.length})</h3>
               </div>
               {renderTable(pendingComplaints, '#d97706', false)}
             </div>
@@ -336,7 +321,7 @@ export default function App() {
             {/* TABLE 2: IN PROGRESS COMPLAINTS */}
             <div style={{ ...cardStyle, marginTop: '24px' }}>
               <div style={cardHeaderStyle}>
-                <h3 style={{ margin: 0, color: '#1d4ed8' }}>⚙️ In Progress Complaints ({inProgressComplaints.length})</h3>
+                <h3 style={{ margin: 0, color: '#3b3732' }}>In Progress Complaints ({inProgressComplaints.length})</h3>
               </div>
               {renderTable(inProgressComplaints, '#2563eb', false)}
             </div>
@@ -344,7 +329,7 @@ export default function App() {
             {/* TABLE 3: SOLVED / RESOLVED COMPLAINTS */}
             <div style={{ ...cardStyle, marginTop: '24px' }}>
               <div style={cardHeaderStyle}>
-                <h3 style={{ margin: 0, color: '#15803d' }}>✅ Solved / Resolved Complaints ({resolvedComplaints.length})</h3>
+                <h3 style={{ margin: 0, color: '#3b3732' }}>Resolved Complaints ({solvedComplaints.length})</h3>
               </div>
               {renderTable(resolvedComplaints, '#16a34a', true)}
             </div>
@@ -354,11 +339,11 @@ export default function App() {
         {/* PUBLIC REPORT PORTAL TAB */}
         {activeTab === 'report' && (
           <div style={cardStyle}>
-            <h2 style={{ marginTop: 0, borderBottom: '1px solid #e2e8f0', paddingBottom: '10px' }}>Submit Geotagged Complaint</h2>
+            <h2 style={{ marginTop: 0, borderBottom: '1px solid #e8e5df', paddingBottom: '10px', color: '#2e2a27' }}>Submit a Civic Complaint</h2>
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               
               <div>
-                <h4 style={{ margin: '0 0 8px 0', color: '#1e3a8a' }}>1. Complainant Personal Details</h4>
+                <h4 style={{ margin: '0 0 8px 0', color: '#25221f' }}>1. Complainant Personal Details</h4>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
                   <input type="text" required placeholder="Full Name *" value={fullName} onChange={e => setFullName(e.target.value)} style={inputStyle} />
                   <input type="tel" required placeholder="Phone Number *" value={phone} onChange={e => setPhone(e.target.value)} style={inputStyle} />
@@ -367,7 +352,7 @@ export default function App() {
               </div>
 
               <div>
-                <h4 style={{ margin: '12px 0 8px 0', color: '#1e3a8a' }}>2. Issue Information</h4>
+                <h4 style={{ margin: '12px 0 8px 0', color: '#25221f' }}>2. Issue Information</h4>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   <input type="text" required placeholder="Issue Title (e.g. Broken Streetlight) *" value={title} onChange={e => setTitle(e.target.value)} style={inputStyle} />
                   
@@ -384,13 +369,13 @@ export default function App() {
               </div>
 
               <div>
-                <h4 style={{ margin: '12px 0 8px 0', color: '#1e3a8a' }}>3. Geotagged Photo Upload</h4>
-                <div style={{ border: '2px dashed #cbd5e1', padding: '16px', borderRadius: '8px', backgroundColor: '#f8fafc', textAlign: 'center' }}>
-                  <input type="file" accept="image/*" capture="environment" required onChange={handlePhotoCapture} />
-                  {locationError && <p style={{ color: '#dc2626', fontSize: '12px', marginTop: '8px' }}>{locationError}</p>}
+                <h4 style={{ margin: '12px 0 8px 0', color: '#25221f' }}>3. Location & Photo</h4>
+                <div style={{ border: '1px dashed #c7c3bd', padding: '20px', borderRadius: '12px', backgroundColor: '#faf7f3', textAlign: 'center' }}>
+                  <input type="file" accept="image/*" capture="environment" required onChange={handlePhotoCapture} style={{ border: 'none', fontSize: '14px', color: '#4e4a44' }} />
+                  {locationError && <p style={{ color: '#9d2c2c', fontSize: '12px', marginTop: '8px' }}>{locationError}</p>}
                   {geoVerified && (
-                    <p style={{ color: '#16a34a', fontSize: '13px', fontWeight: 'bold', marginTop: '8px' }}>
-                      ✅ Geotag Verified: Location set to {humanLocation}
+                    <p style={{ color: '#2f5c31', fontSize: '13px', fontWeight: 'bold', marginTop: '8px' }}>
+                      Location verified: {humanLocation}
                     </p>
                   )}
                 </div>
@@ -400,14 +385,15 @@ export default function App() {
                 type="submit" 
                 disabled={loading || !geoVerified}
                 style={{
-                  padding: '12px',
-                  backgroundColor: geoVerified ? '#1e3a8a' : '#94a3b8',
-                  color: '#fff',
+                  padding: '14px 18px',
+                  backgroundColor: geoVerified ? '#43403c' : '#b3aea8',
+                  color: '#f7f6f2',
                   border: 'none',
-                  borderRadius: '6px',
-                  fontWeight: 'bold',
+                  borderRadius: '10px',
+                  fontWeight: '700',
                   fontSize: '15px',
-                  cursor: geoVerified ? 'pointer' : 'not-allowed'
+                  cursor: geoVerified ? 'pointer' : 'not-allowed',
+                  transition: 'transform 0.2s ease'
                 }}
               >
                 {loading ? 'Submitting...' : 'Submit Verified Report'}
@@ -423,9 +409,9 @@ export default function App() {
 }
 
 // Inline Styles
-const thStyle = { padding: '10px 12px', fontWeight: 'bold' };
-const tdStyle = { padding: '10px 12px', verticalAlign: 'middle' };
-const inputStyle = { padding: '8px 12px', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '14px', width: '100%', boxSizing: 'border-box' };
-const tabBtnStyle = { padding: '6px 14px', border: 'none', borderRadius: '6px', color: '#fff', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' };
-const cardStyle = { backgroundColor: '#ffffff', borderRadius: '8px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: '1px solid #e2e8f0', overflowX: 'auto' };
-const cardHeaderStyle = { paddingBottom: '8px', marginBottom: '12px', borderBottom: '2px solid #f1f5f9' };
+const thStyle = { padding: '12px 14px', fontWeight: '700', color: '#f7f6f2' };
+const tdStyle = { padding: '12px 14px', verticalAlign: 'middle', color: '#3b3833' };
+const inputStyle = { padding: '12px 14px', border: '1px solid #c7c3bd', borderRadius: '10px', fontSize: '14px', width: '100%', boxSizing: 'border-box', backgroundColor: '#faf8f5', color: '#312e29' };
+const tabBtnStyle = { padding: '10px 16px', border: 'none', borderRadius: '10px', color: '#f7f6f2', fontSize: '13px', fontWeight: '700', cursor: 'pointer', minWidth: '150px' };
+const cardStyle = { backgroundColor: '#ffffff', borderRadius: '16px', padding: '28px', boxShadow: '0 18px 40px rgba(24, 24, 24, 0.06)', border: '1px solid #e8e5df', overflowX: 'auto' };
+const cardHeaderStyle = { paddingBottom: '10px', marginBottom: '18px', borderBottom: '1px solid #ece8e1' };
