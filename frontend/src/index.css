@@ -36,6 +36,37 @@
   --c-danger: #b91c1c;
   --c-danger-soft: #fdeceb;
 
+  /* --- Chart palettes. ---------------------------------------------------
+         Categorical: six fixed slots, assigned by category identity and never
+         cycled or re-ordered by rank. A seventh category folds into "Other"
+         rather than getting an invented hue.
+
+         These values are not a taste call. They were run through the
+         colour-vision separation checks (lightness band, chroma floor,
+         deutan/tritan ΔE, contrast vs the card surface) and adjusted until
+         every check passed against #ffffff — and again, separately, against
+         the dark surface below. Changing one means re-running that check;
+         "it looks fine" is not the same test.
+
+         Adjacent deutan separation lands in the 6–8 warning band, which is
+         only permissible because every bar carries a direct text label. Do
+         not remove those labels. --- */
+  --c-cat-1: #4f46e5; /* Roads       */
+  --c-cat-2: #0d9488; /* Sanitation  */
+  --c-cat-3: #a16207; /* Lighting    */
+  --c-cat-4: #be185d; /* Water       */
+  --c-cat-5: #0369a1; /* Drainage    */
+  --c-cat-6: #4d7c0f; /* Other       */
+
+  /* Sequential, one hue light→dark, for priority bands — magnitude, not
+     identity, so a ramp rather than six unrelated hues. */
+  --c-seq-1: #96a4fb;
+  --c-seq-2: #7d8bf6;
+  --c-seq-3: #4f46e5;
+  --c-seq-4: #3730a3;
+
+  --c-grid: #eeeeea;
+
   /* --- Elevation. Layered shadows; a single blur reads flat and cheap. --- */
   --e-1: 0 1px 2px rgb(20 18 30 / 0.05), 0 1px 1px rgb(20 18 30 / 0.03);
   --e-2: 0 1px 3px rgb(20 18 30 / 0.06), 0 8px 16px -6px rgb(20 18 30 / 0.07);
@@ -100,6 +131,25 @@
   --c-ok-soft: #14291d;
   --c-danger: #f87171;
   --c-danger-soft: #2e1a1a;
+
+  /* Dark chart steps are re-picked against the dark surface, not brightened
+     copies of the light ones — an automatic flip fails the separation checks
+     (the light set's teal/magenta pair collapses to ΔE 1.8 under deuteranopia
+     once lifted). Same slot order, so a category keeps its identity across
+     themes even though the hex changes. */
+  --c-cat-1: #6d78ec;
+  --c-cat-2: #12a595;
+  --c-cat-3: #b5842f;
+  --c-cat-4: #d9538d;
+  --c-cat-5: #4a90e2;
+  --c-cat-6: #6d9a28;
+
+  --c-seq-1: #4f46e5;
+  --c-seq-2: #6366f1;
+  --c-seq-3: #818cf8;
+  --c-seq-4: #c7d2fe;
+
+  --c-grid: #23232a;
 
   --e-1: 0 1px 2px rgb(0 0 0 / 0.4);
   --e-2: 0 1px 3px rgb(0 0 0 / 0.5), 0 8px 16px -6px rgb(0 0 0 / 0.5);
@@ -483,7 +533,8 @@ h4 {
   border-radius: var(--r-md);
 }
 
-.segmented button {
+.segmented button,
+.segmented a {
   position: relative;
   z-index: 1;
   display: inline-flex;
@@ -496,6 +547,7 @@ h4 {
   color: var(--c-ink-3);
   font-size: 14px;
   font-weight: 550;
+  text-decoration: none;
   cursor: pointer;
   white-space: nowrap;
   transition:
@@ -503,11 +555,17 @@ h4 {
     background var(--t-fast) ease;
 }
 
-.segmented button:hover {
+.segmented button:hover,
+.segmented a:hover {
   color: var(--c-ink);
 }
 
-.segmented button[aria-selected='true'] {
+/* Three ways to be the selected segment, because the control does three jobs:
+   `aria-selected` for tabs, `aria-pressed` for a group of toggles, and
+   `aria-current` for the router's navigation links. */
+.segmented button[aria-selected='true'],
+.segmented button[aria-pressed='true'],
+.segmented a[aria-current='page'] {
   color: var(--c-ink);
   background: var(--c-surface);
   box-shadow: var(--e-1);
@@ -1698,7 +1756,8 @@ select.input {
     display: none;
   }
 
-  .segmented button {
+  .segmented button,
+  .segmented a {
     padding: 8px 12px;
   }
 
@@ -1734,4 +1793,342 @@ select.input {
   .spread > .row > div:first-child {
     flex: 1;
   }
+}
+
+/* ==========================================================================
+   Charts
+   Marks stay thin, grid and axes stay recessive, and every value that matters
+   is reachable as text — via a direct label, a tooltip, or the table view.
+   ========================================================================== */
+
+.chart-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+@media (max-width: 860px) {
+  .chart-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.chart-fig {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 0;
+  padding: 18px;
+  background: var(--c-surface);
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-md);
+  box-shadow: var(--e-1);
+}
+
+.chart-title {
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--c-ink);
+}
+
+.chart-note {
+  margin-top: 4px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--c-ink-3);
+}
+
+.chart-empty {
+  padding: 22px 0;
+  font-size: 13px;
+  text-align: center;
+  color: var(--c-ink-3);
+}
+
+/* --- Horizontal bars --- */
+
+.bar-rows {
+  display: grid;
+  gap: 10px;
+}
+
+.bar-row {
+  display: grid;
+  grid-template-columns: minmax(0, 11rem) 1fr auto;
+  gap: 12px;
+  align-items: center;
+  font-size: 13px;
+}
+
+/* Labels wrap rather than truncate. They are the non-colour half of the
+   chart's encoding, so "Sanitation & garba…" is not an acceptable render. */
+.bar-name {
+  color: var(--c-ink-2);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.bar-track {
+  height: 10px;
+  background: var(--c-surface-3);
+  border-radius: var(--r-full);
+}
+
+/* Rounded only at the data end; the baseline end stays square so the bar
+   visibly starts at zero instead of floating. */
+.bar-fill {
+  display: block;
+  min-width: 3px;
+  height: 100%;
+  border-radius: 0 4px 4px 0;
+  transition: width var(--t-slow) var(--ease-out);
+}
+
+.bar-value {
+  min-width: 2.2rem;
+  font-weight: 600;
+  color: var(--c-ink);
+  text-align: right;
+}
+
+@media (max-width: 520px) {
+  .bar-row {
+    grid-template-columns: 1fr auto;
+  }
+
+  .bar-name {
+    grid-column: 1;
+  }
+
+  .bar-value {
+    grid-column: 2;
+  }
+
+  .bar-track {
+    grid-column: 1 / -1;
+  }
+}
+
+/* --- Daily columns --- */
+
+.col-chart {
+  display: flex;
+  gap: 2px;
+  align-items: flex-end;
+  height: 150px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--c-line-strong);
+  /* Four recessive gridlines, drawn behind the marks rather than over them. */
+  background-image: repeating-linear-gradient(
+    to top,
+    var(--c-grid) 0 1px,
+    transparent 1px 25%
+  );
+}
+
+.col {
+  position: relative;
+  display: flex;
+  flex: 1;
+  align-items: flex-end;
+  height: 100%;
+  cursor: default;
+}
+
+.col-bar {
+  width: 100%;
+  min-height: 2px;
+  background: var(--c-brand);
+  border-radius: 3px 3px 0 0;
+  transition: height var(--t-slow) var(--ease-out), background var(--t-fast);
+}
+
+/* A day with no reports is still a day — show the baseline tick rather than
+   nothing, so the gap reads as measured instead of missing. */
+.col-bar-zero {
+  min-height: 2px;
+  background: var(--c-line-strong);
+}
+
+.col:hover .col-bar {
+  background: var(--c-brand-hover);
+}
+
+.col-label {
+  position: absolute;
+  bottom: -19px;
+  left: 50%;
+  font-size: 11px;
+  color: var(--c-ink-3);
+  white-space: nowrap;
+  transform: translateX(-50%);
+}
+
+/* --- Legend --- */
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  padding: 0;
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--c-ink-2);
+  list-style: none;
+}
+
+.legend-item {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.legend-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+/* --- Tooltip --- */
+
+.chart-tip {
+  position: fixed;
+  z-index: 60;
+  display: grid;
+  gap: 2px;
+  max-width: 15rem;
+  padding: 7px 10px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--c-ink-2);
+  pointer-events: none;
+  background: var(--c-surface);
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-xs);
+  box-shadow: var(--e-2);
+  transform: translate(12px, -50%);
+}
+
+.chart-tip b {
+  color: var(--c-ink);
+}
+
+.chart-tip-note {
+  color: var(--c-ink-3);
+}
+
+/* --- Table view --- */
+
+.chart-table > summary {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  width: fit-content;
+  font-size: 12.5px;
+  color: var(--c-ink-3);
+  cursor: pointer;
+}
+
+.chart-table > summary:hover {
+  color: var(--c-brand);
+}
+
+.chart-table[open] > summary {
+  margin-bottom: 10px;
+}
+
+/* ==========================================================================
+   Case detail
+   ========================================================================== */
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 20rem;
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .detail-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.kv {
+  display: grid;
+  grid-template-columns: 8.5rem minmax(0, 1fr);
+  gap: 8px 14px;
+  font-size: 13.5px;
+}
+
+.kv dt {
+  color: var(--c-ink-3);
+}
+
+.kv dd {
+  margin: 0;
+  color: var(--c-ink);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 520px) {
+  .kv {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+
+  .kv dd {
+    margin-bottom: 8px;
+  }
+}
+
+/* Breadcrumb back-link above a detail page title. */
+.backlink {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  font-size: 13px;
+  color: var(--c-ink-3);
+  text-decoration: none;
+}
+
+.backlink:hover {
+  color: var(--c-brand);
+}
+
+/* Sort control in a table header — a button that doesn't look like one. */
+.th-sort {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  background: none;
+  border: 0;
+}
+
+.th-sort:hover {
+  color: var(--c-brand);
+}
+
+/* Whole-row link target. The anchor sits on the case reference so the row
+   still works with a keyboard and still offers a real URL to copy. */
+.row-link {
+  font-weight: 600;
+  color: var(--c-brand);
+  text-decoration: none;
+}
+
+.row-link:hover {
+  text-decoration: underline;
+}
+
+tr.clickable {
+  cursor: pointer;
+}
+
+tr.clickable:hover {
+  background: var(--c-surface-2);
 }

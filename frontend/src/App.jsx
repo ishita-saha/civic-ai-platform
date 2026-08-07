@@ -1,38 +1,52 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
-  Home,
+  BrowserRouter,
+  Link,
+  Navigate,
+  NavLink,
+  Outlet,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+} from 'react-router-dom';
+import {
+  Compass,
+  Home as HomeIcon,
+  Images,
   LayoutDashboard,
   LogOut,
   Megaphone,
   Moon,
+  Search,
   ShieldCheck,
   Sun,
-  Images,
 } from 'lucide-react';
-import AdminDashboard from './components/AdminDashboard';
 import { AuthProvider } from './components/AuthProvider';
-import Landing from './components/Landing';
-import Login from './components/Login';
+import { ComplaintsProvider } from './components/ComplaintsProvider';
+import EmptyState from './components/EmptyState';
 import PastWork from './components/PastWork';
 import ReportForm from './components/ReportForm';
 import { ToastProvider } from './components/Toast';
-import { listComplaints, readableError } from './lib/api';
 import { useAuth } from './lib/authContext';
+import { useComplaints } from './lib/complaintsContext';
 import { initials } from './lib/format';
 import { useToast } from './lib/toastContext';
+import AdminAnalytics from './pages/admin/Analytics';
+import AdminComplaintDetails from './pages/admin/ComplaintDetails';
+import AdminDashboard from './pages/admin/Dashboard';
+import CitizenComplaintDetails from './pages/citizen/ComplaintDetails';
+import Home from './pages/citizen/Home';
+import Login from './pages/citizen/Login';
+import TrackComplaint from './pages/citizen/TrackComplaint';
 
-const TABS = [
-  { id: 'home', label: 'Home', icon: Home },
-  { id: 'report', label: 'Report an issue', icon: Megaphone },
-  { id: 'work', label: 'Past work', icon: Images },
-  { id: 'admin', label: 'Dashboard', icon: LayoutDashboard },
+const NAV = [
+  { to: '/', label: 'Home', icon: HomeIcon, end: true },
+  { to: '/report', label: 'Report an issue', icon: Megaphone },
+  { to: '/track', label: 'Track', icon: Search },
+  { to: '/work', label: 'Past work', icon: Images },
+  { to: '/admin', label: 'Dashboard', icon: LayoutDashboard },
 ];
-
-/** Tab lives in the URL hash so refresh and the back button both behave. */
-function tabFromHash() {
-  const id = window.location.hash.replace('#', '');
-  return TABS.some((t) => t.id === id) ? id : 'home';
-}
 
 function useTheme() {
   const [theme, setTheme] = useState(() => {
@@ -49,64 +63,80 @@ function useTheme() {
   return [theme, () => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))];
 }
 
-function AppShell() {
+/**
+ * A router keeps the scroll position across navigations by default, which lands
+ * you halfway down a page you have never seen. Reset on every path change —
+ * but not on a query-string change, since that's a filter, not a new page.
+ */
+function useScrollReset() {
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [pathname]);
+}
+
+/**
+ * Before the router, sections were addressed by URL hash — `#admin`, `#report`.
+ * Anyone who bookmarked one or pasted it into an email still has that link, and
+ * it now lands on the home page with a hash nothing reads. Translate the four
+ * that existed, once, on first load.
+ */
+const LEGACY_HASH = { home: '/', report: '/report', work: '/work', admin: '/admin' };
+
+function useLegacyHashRedirect() {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const target = LEGACY_HASH[window.location.hash.replace('#', '')];
+    if (!target) return;
+
+    // Drop the hash first, or it survives the navigation and re-triggers on
+    // any later remount.
+    window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    navigate(target, { replace: true });
+  }, [navigate]);
+}
+
+/**
+ * Gate for the staff routes.
+ *
+ * This is a CLIENT-SIDE gate, not security — the FastAPI backend still answers
+ * unauthenticated requests, so `curl localhost:8000/complaints` returns every
+ * reporter's name and phone number whatever this component does. See the note
+ * at the top of AuthProvider.jsx.
+ *
+ * What it does buy: the dashboard isn't the first thing a stranger sees, and
+ * there's one seam to replace when real auth arrives.
+ */
+function RequireAuth() {
+  const { user } = useAuth();
+  const location = useLocation();
+
+  if (!user) {
+    // Carry the intended destination so signing in resumes it rather than
+    // dumping everyone on the dashboard root.
+    const next = encodeURIComponent(location.pathname + location.search);
+    return <Navigate to={`/login?next=${next}`} replace />;
+  }
+
+  return <Outlet />;
+}
+
+function Shell() {
   const toast = useToast();
   const { user, signOut } = useAuth();
+  const { loading } = useComplaints();
   const [theme, toggleTheme] = useTheme();
-  const [tab, setTab] = useState(tabFromHash);
-  const [complaints, setComplaints] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [lastUpdated, setLastUpdated] = useState(null);
 
-  useEffect(() => {
-    const onHash = () => setTab(tabFromHash());
-    window.addEventListener('hashchange', onHash);
-    return () => window.removeEventListener('hashchange', onHash);
-  }, []);
-
-  const go = (id) => {
-    window.location.hash = id;
-    setTab(id);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  const load = useCallback(
-    async ({ announce = false } = {}) => {
-      setLoading(true);
-      try {
-        setComplaints(await listComplaints());
-        setLastUpdated(new Date());
-        if (announce) toast.success('Up to date', 'Latest cases pulled from the server.');
-      } catch (err) {
-        toast.error('Could not load cases', readableError(err));
-      } finally {
-        setLoading(false);
-      }
-    },
-    [toast],
-  );
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  const handleSignOut = () => {
-    signOut();
-    toast.info('Signed out', 'The dashboard is locked again.');
-    go('home');
-  };
+  useScrollReset();
+  useLegacyHashRedirect();
 
   return (
     <>
       <header className="topbar">
         <div className="shell topbar-inner">
-          <button
-            type="button"
-            className="brand"
-            onClick={() => go('home')}
-            style={{ background: 'none', border: 0, padding: 0, cursor: 'pointer', textAlign: 'left' }}
-            aria-label="CivicFix home"
-          >
+          <Link to="/" className="brand" aria-label="CivicFix home" style={{ textDecoration: 'none' }}>
             <span className="brand-mark">
               <ShieldCheck size={18} aria-hidden="true" />
             </span>
@@ -116,26 +146,24 @@ function AppShell() {
                 Geo-verified civic reporting
               </span>
             </span>
-          </button>
+          </Link>
 
           <div className="row" style={{ '--gap': '10px' }}>
-            <div className="segmented" role="tablist" aria-label="Sections">
-              {TABS.map((t) => (
-                <button
-                  key={t.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={tab === t.id}
+            <nav className="segmented" aria-label="Sections">
+              {NAV.map((item) => (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  end={item.end}
                   // The visible label is hidden on narrow screens, so the name
-                  // has to live on the button itself.
-                  aria-label={t.label}
-                  onClick={() => go(t.id)}
+                  // has to live on the link itself.
+                  aria-label={item.label}
                 >
-                  <t.icon size={15} aria-hidden="true" />
-                  <span className="tab-label">{t.label}</span>
-                </button>
+                  <item.icon size={15} aria-hidden="true" />
+                  <span className="tab-label">{item.label}</span>
+                </NavLink>
               ))}
-            </div>
+            </nav>
 
             {user && (
               <div className="whoami">
@@ -153,7 +181,10 @@ function AppShell() {
                 <button
                   type="button"
                   className="btn btn-ghost btn-icon"
-                  onClick={handleSignOut}
+                  onClick={() => {
+                    signOut();
+                    toast.info('Signed out', 'The dashboard is locked again.');
+                  }}
                   aria-label="Sign out"
                   title="Sign out"
                 >
@@ -179,33 +210,7 @@ function AppShell() {
 
       <main className="page">
         <div className="shell">
-          {tab === 'home' && (
-            <Landing
-              complaints={complaints}
-              onReport={() => go('report')}
-              // Sends citizens to the public before/after gallery, not the
-              // login-gated dashboard — a CTA shouldn't dead-end at a password.
-              onSeeWork={() => go('work')}
-            />
-          )}
-
-          {tab === 'report' && <ReportForm onSubmitted={load} />}
-
-          {tab === 'work' && <PastWork complaints={complaints} loading={loading} />}
-
-          {/* The dashboard exposes reporters' names and phone numbers, so it
-              only renders for a signed-in staff session. */}
-          {tab === 'admin' &&
-            (user ? (
-              <AdminDashboard
-                complaints={complaints}
-                loading={loading}
-                onRefresh={() => load({ announce: true })}
-                lastUpdated={lastUpdated}
-              />
-            ) : (
-              <Login onSignedIn={() => toast.success('Signed in', 'Welcome back.')} />
-            ))}
+          <Outlet />
         </div>
       </main>
 
@@ -219,12 +224,61 @@ function AppShell() {
   );
 }
 
+function ReportRoute() {
+  const { refresh } = useComplaints();
+  return <ReportForm onSubmitted={refresh} />;
+}
+
+function PastWorkRoute() {
+  const { complaints, loading } = useComplaints();
+  return <PastWork complaints={complaints} loading={loading} />;
+}
+
+function NotFound() {
+  return (
+    <div className="page-enter" style={{ maxWidth: 560, margin: '40px auto 0' }}>
+      <div className="card">
+        <EmptyState icon={Compass} title="That page doesn't exist">
+          The link may be out of date. Everything is reachable from the home page.
+        </EmptyState>
+        <div className="card-body" style={{ paddingTop: 0, textAlign: 'center' }}>
+          <Link className="btn btn-primary" to="/">
+            Go home
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   return (
-    <AuthProvider>
-      <ToastProvider>
-        <AppShell />
-      </ToastProvider>
-    </AuthProvider>
+    <BrowserRouter>
+      <AuthProvider>
+        <ToastProvider>
+          {/* Inside ToastProvider: the loader reports failures as toasts. */}
+          <ComplaintsProvider>
+            <Routes>
+              <Route element={<Shell />}>
+                <Route index element={<Home />} />
+                <Route path="report" element={<ReportRoute />} />
+                <Route path="track" element={<TrackComplaint />} />
+                <Route path="work" element={<PastWorkRoute />} />
+                <Route path="complaint/:id" element={<CitizenComplaintDetails />} />
+                <Route path="login" element={<Login />} />
+
+                <Route path="admin" element={<RequireAuth />}>
+                  <Route index element={<AdminDashboard />} />
+                  <Route path="analytics" element={<AdminAnalytics />} />
+                  <Route path="case/:id" element={<AdminComplaintDetails />} />
+                </Route>
+
+                <Route path="*" element={<NotFound />} />
+              </Route>
+            </Routes>
+          </ComplaintsProvider>
+        </ToastProvider>
+      </AuthProvider>
+    </BrowserRouter>
   );
 }
