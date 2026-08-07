@@ -1,8 +1,20 @@
-fastapi
-uvicorn
-supabase
-pydantic
-requests
-google-generativeai
-scikit-learn
-numpy
+# What the API actually needs to serve a request today.
+fastapi==0.141.1
+uvicorn==0.52.1
+pydantic==2.13.4
+
+# The Postgres layer — database.py, models.py, routers/complaints.py.
+# Not wired into main.py yet, but these must be installed for those modules
+# to even import. See ARCHITECTURE.md.
+SQLAlchemy==1.4.54
+psycopg2-binary==2.9.12
+python-dotenv==1.2.2
+
+# NOT INSTALLED ON PURPOSE
+# ------------------------
+# supabase, google-generativeai, scikit-learn, numpy
+#
+# These were listed here for the clustering / vision / RAG features. Every
+# module meant to use them (backend/ai/*.py) is currently an empty file, so
+# installing them costs several minutes and a compiler toolchain in exchange
+# for nothing. Add them back in the same commit that adds code importing them.

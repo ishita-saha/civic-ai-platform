@@ -222,8 +222,12 @@ touches it next.
 
 ## Known sharp edges
 
-- **`database.py` crashes on import when `DATABASE_URL` is unset.** `create_engine(None)`
-  raises at module scope. Currently invisible because `main.py` never imports it.
+- **The engine is built lazily, on purpose.** `database.py` used to call
+  `create_engine(DATABASE_URL)` at module scope, which raised the instant
+  `DATABASE_URL` was unset — so importing `models` or `routers.complaints` died
+  with a SQLAlchemy stack trace instead of a useful message. It now builds the
+  engine on first use via `get_engine()`. If you add a module-level
+  `engine = ...` back, you reintroduce that.
 - **IDs collide after a delete.** `id = len(mock_complaints) + 1` reuses numbers
   as soon as anything is removed. Fine for a list that only grows; a bug the
   moment it doesn't.

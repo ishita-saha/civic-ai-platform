@@ -63,6 +63,12 @@ uvicorn main:app --reload
 
 Serves on `http://127.0.0.1:8000`. Interactive API docs at `/docs`.
 
+> **`ModuleNotFoundError: No module named 'fastapi'`** means the venv is active
+> but empty — run the `pip install` line above. If it says the same thing
+> *without* the venv active, you're on system Python and the packages are
+> somewhere else. `python -c "import sys; print(sys.executable)"` tells you
+> which interpreter you actually got.
+
 **Frontend** — from `frontend/`:
 
 ```bash
