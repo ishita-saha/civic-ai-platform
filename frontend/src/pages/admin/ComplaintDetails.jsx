@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import {
   AlertTriangle,
   ArrowLeft,
+  ChevronUp,
   ExternalLink,
   FileQuestion,
   Loader2,
@@ -17,13 +18,14 @@ import {
 import BeforeAfter from '../../components/BeforeAfter';
 import CaseTimeline from '../../components/CaseTimeline';
 import EmptyState from '../../components/EmptyState';
+import SeverityBadge from '../../components/SeverityBadge';
 import StatusBadge from '../../components/StatusBadge';
-import { readableError, updateComplaintStatus } from '../../lib/api';
+import { readableError, updateComplaintStatus, verifyComplaint } from '../../lib/api';
 import { priorityScale } from '../../lib/analytics';
 import { useAuth } from '../../lib/authContext';
 import { useComplaints } from '../../lib/complaintsContext';
 import { photoPair } from '../../lib/demoData';
-import { coords, initials, mapsUrl, placeName, statusOf, when } from '../../lib/format';
+import { coords, initials, mapsUrl, placeName, statusOf, upvotesOf, when } from '../../lib/format';
 import { useToast } from '../../lib/toastContext';
 import { useComplaint } from '../../lib/useComplaint';
 
@@ -59,6 +61,23 @@ function StatusControls({ complaint, onApplied }) {
 
   const unchanged = NEXT_STATUS.find((s) => s.value === status)?.lane === statusOf(complaint);
 
+  const verify = async () => {
+    setBusy(true);
+    try {
+      const updated = await verifyComplaint(complaint.id, {
+        verifiedBy: user?.name,
+        note: note.trim() || `Checked and confirmed by ${user?.name}.`,
+      });
+      onApplied({ ...complaint, ...updated });
+      setNote('');
+      toast.success(`#${complaint.id} verified`, 'A crew can be dispatched to it now.');
+    } catch (err) {
+      toast.error('Could not verify', readableError(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const submit = async (e) => {
     e.preventDefault();
     setBusy(true);
@@ -91,6 +110,28 @@ function StatusControls({ complaint, onApplied }) {
         <h3>Move this case</h3>
       </div>
       <div className="card-body stack" style={{ '--gap': '14px' }}>
+        {/* Verification is a gate, not a status — the API rejects a move to "in
+            progress" on an unchecked report whatever this form sends. Showing
+            the gate here means the rejection is never a surprise. */}
+        {complaint.verified ? (
+          <p className="row" style={{ '--gap': '7px', fontSize: 13, color: 'var(--c-ok)' }}>
+            <ShieldCheck size={14} aria-hidden="true" style={{ flex: 'none' }} />
+            Verified by {complaint.verified_by || 'the desk'}
+            {complaint.verified_at ? ` · ${when(complaint.verified_at)}` : ''}
+          </p>
+        ) : (
+          <div className="geo geo-pending" style={{ flexWrap: 'wrap' }}>
+            <AlertTriangle size={15} aria-hidden="true" style={{ flex: 'none' }} />
+            <span style={{ flex: 1, minWidth: 160 }}>
+              Not verified yet. Nothing can be dispatched until it is.
+            </span>
+            <button type="button" className="btn" onClick={verify} disabled={busy}>
+              <ShieldCheck size={14} aria-hidden="true" />
+              Verify
+            </button>
+          </div>
+        )}
+
         <div className="field">
           <label htmlFor="status">Status</label>
           <select
@@ -158,7 +199,8 @@ function StatusControls({ complaint, onApplied }) {
 
         {user && (
           <p className="hint" style={{ fontSize: 12 }}>
-            Acting as {user.name} · {user.empId}
+            Acting as {user.name}
+            {user.emp_id ? ` · ${user.emp_id}` : ''}
           </p>
         )}
       </div>
@@ -174,7 +216,7 @@ export default function ComplaintDetails() {
   const back = (
     <Link className="backlink" to="/admin">
       <ArrowLeft size={14} aria-hidden="true" />
-      Back to the dashboard
+      Back to the triage queue
     </Link>
   );
 
@@ -247,10 +289,15 @@ export default function ComplaintDetails() {
 
       <div className="spread" style={{ alignItems: 'flex-start' }}>
         <div style={{ minWidth: 0 }}>
-          <div className="row" style={{ '--gap': '8px', marginBottom: 6 }}>
+          <div className="row" style={{ '--gap': '8px', marginBottom: 6, flexWrap: 'wrap' }}>
             <span className="mono hint">#{complaint.id}</span>
             <span className="chip">{complaint.category || 'General'}</span>
+            <SeverityBadge item={complaint} />
             {score !== null && <span className="chip tnum">Priority {Math.round(score)}</span>}
+            <span className="chip tnum" title="Residents who backed this report">
+              <ChevronUp size={12} aria-hidden="true" />
+              {upvotesOf(complaint)} backing
+            </span>
           </div>
           <h2 className="page-title">{complaint.title || 'Untitled report'}</h2>
           <p className="page-lede">{complaint.description || 'No description was recorded.'}</p>

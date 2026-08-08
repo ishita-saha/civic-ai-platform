@@ -8,19 +8,19 @@ import { statusOf, when } from '../lib/format';
  * stage here rather than a synonym.
  */
 const STAGES = [
-  { key: 'filed', title: 'Filed', body: 'Photo, GPS fix and contact details logged. Reference issued.' },
-  { key: 'triaged', title: 'Triaged', body: 'Read at the desk and handed to the department that owns it.' },
-  { key: 'assigned', title: 'Crew assigned', body: 'A named engineer is responsible for the work.' },
+  { key: 'filed', title: 'Filed', body: 'Posted to the feed with the place and the problem. Reference issued.' },
+  { key: 'verified', title: 'Verified', body: 'Checked by the administrator and confirmed as real. Nothing is dispatched before this.' },
+  { key: 'assigned', title: 'Work started', body: 'A crew is on it and the case shows as active work.' },
   { key: 'closed', title: 'Closed with proof', body: 'Finished work photographed and signed off by an inspector.' },
 ];
 
 /**
  * How far along the pipeline a case has visibly got.
  *
- * The backend stores one status string, not a stage history — so this is an
- * inference, not a record. "In progress" is treated as reaching stage 3 because
- * a case cannot be worked on without having been triaged and assigned first.
- * When `status_history` is actually served, this function is what to replace.
+ * Partly a record, partly an inference. Verification is a real flag the API
+ * sets, so stage 2 is known. The rest still comes from the single status
+ * string: "in progress" implies verification happened, because the API refuses
+ * to move an unverified case there at all.
  */
 function reachedCount(complaint) {
   switch (statusOf(complaint)) {
@@ -29,7 +29,7 @@ function reachedCount(complaint) {
     case 'progress':
       return 3;
     default:
-      return 1;
+      return complaint?.verified ? 2 : 1;
   }
 }
 
@@ -43,10 +43,12 @@ export default function CaseTimeline({ complaint }) {
         const done = i < reached;
         const current = i === reached - 1;
 
-        // Only two moments have a real timestamp behind them. The stages in
-        // between get no date rather than an invented one.
+        // Three moments have a real timestamp behind them. "Work started" gets
+        // no date rather than an invented one — the API stores the transition
+        // but not, yet, when the crew actually arrived.
         const stamp =
           (stage.key === 'filed' && filedAt) ||
+          (stage.key === 'verified' && complaint?.verified_at) ||
           (stage.key === 'closed' && complaint?.resolved_at) ||
           null;
 

@@ -53,9 +53,24 @@ export function ComplaintsProvider({ children }) {
     );
   }, []);
 
+  /**
+   * Put a freshly created case at the top of the cached list.
+   *
+   * The community feed posts and then wants to see the post — a refetch would
+   * do it, but it throws away the list everyone else is reading and flashes the
+   * loading bar for a record we already hold. Guards against duplicates so a
+   * refresh landing at the same moment doesn't double it up.
+   */
+  const addOne = useCallback((record) => {
+    if (!record?.id) return;
+    setComplaints((list) =>
+      list.some((c) => String(c.id) === String(record.id)) ? list : [record, ...list],
+    );
+  }, []);
+
   const value = useMemo(
-    () => ({ complaints, loading, error, lastUpdated, refresh, patchOne }),
-    [complaints, loading, error, lastUpdated, refresh, patchOne],
+    () => ({ complaints, loading, error, lastUpdated, refresh, patchOne, addOne }),
+    [complaints, loading, error, lastUpdated, refresh, patchOne, addOne],
   );
 
   return <ComplaintsContext.Provider value={value}>{children}</ComplaintsContext.Provider>;

@@ -13,8 +13,22 @@ crews lost half-days driving out to find three big trees and no pothole.
 
 ## What works right now
 
-- **Citizen reporting** — contact details, issue, category, photo, live GPS
-  verification, and a reference number on submit.
+- **Accounts** — sign up as a resident, sign in as a resident or as the one
+  administrator (Ishita). Signup mints citizens only; the API ignores any role
+  sent in the body, so the admin account cannot be created from the browser.
+- **A community feed** — residents post problems and back each other's with an
+  upvote. One vote per account, tracked by account id rather than a counter, so
+  pressing twice removes your vote instead of inflating the case.
+- **Severity classification on filing** — a keyword pass over the report's own
+  words puts it in one of four bands. "Open manhole" outranks "faded paint"
+  whether or not anyone has upvoted it.
+- **A ranked triage queue** — severity plus a *capped* bonus for backing, so
+  popularity moves a case up but never lets a nuisance outrank a hazard.
+- **A verification gate** — the administrator has to confirm a report is real
+  before work can start on it. The API enforces this, not just the button: a
+  status change to "in progress" on an unverified case is refused with a 409.
+- **Citizen reporting** — the formal channel: contact details, issue, category,
+  photo, live GPS verification, and a reference number on submit.
 - **Staff dashboard** — every case bucketed into awaiting triage / in progress /
   resolved, with search across all fields and how long each case has been open.
 - **Closed cases carry proof** — a before/after pair showing how the place
@@ -30,16 +44,22 @@ crews lost half-days driving out to find three big trees and no pothole.
 Being straight about this up front, because the alternative is you finding out
 during a demo:
 
-- **Nothing is persisted.** Reports live in a Python list. Restart the API and
-  they're gone. The Postgres schema is written but not connected.
+- **Nothing is persisted.** Accounts, posts and votes live in Python lists.
+  Restart the API and they're gone, back to the seeded demo set. The Postgres
+  schema is written but not connected.
 - **Photos aren't stored.** Only the filename reaches the server. The image
   never leaves the browser.
-- **The login is cosmetic.** It keeps the dashboard off the landing page. It is
-  not access control — the API answers anyone. See
+- **Auth is half-real.** Passwords are stored and compared in plaintext, and the
+  session is an unsigned object in `localStorage` — edit it in devtools and the
+  UI believes you. What *is* enforced server-side is the admin's write access:
+  verifying or dispatching needs a key only an admin login returns. Citizen
+  reads are wide open; the API answers anyone. See
   [ARCHITECTURE.md](ARCHITECTURE.md#auth).
 - **No notifications.** You get a reference number on screen and that's it.
-- **No duplicate detection.** Four people reporting one pothole makes four cases.
-- **No AI anything.** `priority_score` is hardcoded to `85`. Department is
+- **No duplicate detection.** Four people reporting one pothole still makes four
+  cases — upvoting an existing post is the manual workaround, not a fix.
+- **The classifier is keywords, not AI.** `classify_severity` in `main.py` is a
+  word list. It is explainable and it is not a model. Department is still
   derived from the category dropdown.
 
 That last one matters: earlier versions of this README advertised DBSCAN
@@ -58,10 +78,22 @@ You need Python 3.10+ and Node 18+.
 python -m venv venv
 source venv/bin/activate      # Windows: venv\Scripts\activate
 pip install -r requirements.txt
-uvicorn main:app --reload
+python main.py                # or: uvicorn main:app --reload
 ```
 
-Serves on `http://127.0.0.1:8000`. Interactive API docs at `/docs`.
+Serves on `http://127.0.0.1:8000`. Interactive API docs at `/docs`. It prints
+the URL on startup — if you see no such line, no server started.
+
+Both commands do the same thing. `python main.py` is there because running a
+FastAPI file directly used to import the module, define the app, start nothing
+and exit `0` — silently, which is indistinguishable from a backend that "isn't
+working".
+
+> **The frontend says it can't reach the server, or a request 404s on a route
+> you can see in the code.** The API holds everything in memory and does not
+> reload accounts or posts from anywhere, so a process started before you pulled
+> is still serving the old routes. Stop it and start it again. `curl
+> http://127.0.0.1:8000/` should answer with a count of users and posts.
 
 > **`ModuleNotFoundError: No module named 'fastapi'`** means the venv is active
 > but empty — run the `pip install` line above. If it says the same thing
@@ -82,8 +114,24 @@ with `VITE_API_URL` in `frontend/.env` if you moved it.
 Start the backend first, or the dashboard loads empty and shows a connection
 error. That error is accurate — it means exactly what it says.
 
-**Signing in.** The dashboard sits behind a staff login. The demo accounts are
-printed on the login screen itself; click one to fill the form.
+**Signing in.** The landing page at `/` is the front door and the only screen
+reachable without an account — every other route bounces a signed-out visitor
+back to it, carrying the destination so signing in resumes where they were
+headed. The accounts are printed on the login screen itself; one press signs you
+straight in. There is exactly one administrator:
+
+| Role | Email | Password |
+|---|---|---|
+| Administrator | `ishita@civicfix.gov.in` | `admin123` |
+| Resident | `aritra@demo.in` | `civic123` |
+| Resident | `priya@demo.in` | `civic123` |
+| Resident | `farhan@demo.in` | `civic123` |
+| Resident | `meera@demo.in` | `civic123` |
+| Resident | `debjit@demo.in` | `civic123` |
+
+To see upvoting work, sign in as one resident and back a post another one made
+— you cannot upvote your own. The count feeds straight into the ordering of the
+administrator's queue.
 
 ---
 
@@ -99,6 +147,12 @@ seed_data/   Supabase seeding script.
 [ARCHITECTURE.md](ARCHITECTURE.md) covers how the pieces fit, why the odd
 decisions were made, and where the sharp edges are.
 
+[DATA-AND-DATABASE.md](DATA-AND-DATABASE.md) is the one to read before putting
+real people on it: an inventory of every piece of demo data and how to remove
+it, what the Postgres layer is and what it still can't store, how to swap the
+in-memory lists for real tables and real accounts, and how to watch live
+activity once there is any.
+
 ---
 
 ## Stack
@@ -107,8 +161,8 @@ React 19, Vite 8, plain CSS with custom properties, `lucide-react` for icons,
 axios. FastAPI and Pydantic on the server. SQLAlchemy and Supabase are present
 as dependencies but not yet in the request path.
 
-No Tailwind — the design system is a single ~1,600-line stylesheet at
-`frontend/src/index.css` (about 5 kB gzipped), built on custom properties. Every colour and easing
+No Tailwind — the design system is a single ~2,400-line stylesheet at
+`frontend/src/index.css` (about 7 kB gzipped), built on custom properties. Every colour and easing
 curve is a token; dark mode is a second token block and no component knows which
 theme is running.
 
