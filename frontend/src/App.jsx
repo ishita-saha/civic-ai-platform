@@ -11,16 +11,22 @@ import {
   useNavigate,
 } from 'react-router-dom';
 import {
+  BarChart3,
   Compass,
   Home as HomeIcon,
   Images,
   LayoutDashboard,
+  Lock,
+  LogIn,
   LogOut,
   Megaphone,
   Moon,
   Search,
   ShieldCheck,
   Sun,
+  Table2,
+  UserPlus,
+  Users,
 } from 'lucide-react';
 import { AuthProvider } from './components/AuthProvider';
 import { ComplaintsProvider } from './components/ComplaintsProvider';
@@ -32,21 +38,44 @@ import { useAuth } from './lib/authContext';
 import { useComplaints } from './lib/complaintsContext';
 import { initials } from './lib/format';
 import { useToast } from './lib/toastContext';
+import Login from './pages/Login';
+import Signup from './pages/Signup';
 import AdminAnalytics from './pages/admin/Analytics';
 import AdminComplaintDetails from './pages/admin/ComplaintDetails';
 import AdminDashboard from './pages/admin/Dashboard';
+import AdminTriage from './pages/admin/Triage';
+import Community from './pages/citizen/Community';
 import CitizenComplaintDetails from './pages/citizen/ComplaintDetails';
 import Home from './pages/citizen/Home';
-import Login from './pages/citizen/Login';
 import TrackComplaint from './pages/citizen/TrackComplaint';
 
-const NAV = [
-  { to: '/', label: 'Home', icon: HomeIcon, end: true },
-  { to: '/report', label: 'Report an issue', icon: Megaphone },
-  { to: '/track', label: 'Track', icon: Search },
-  { to: '/work', label: 'Past work', icon: Images },
-  { to: '/admin', label: 'Dashboard', icon: LayoutDashboard },
-];
+/**
+ * The nav is the clearest statement of what each role's portal *is*, so it is
+ * built per role rather than shown-and-disabled. An admin has no use for the
+ * citizen report form; a resident has no business seeing a link to the triage
+ * queue they cannot open.
+ *
+ * A signed-out visitor gets no nav at all. Every destination behind it needs an
+ * account, and a row of links that all bounce back to where you started is
+ * worse than no row.
+ */
+const NAV = {
+  guest: [],
+  citizen: [
+    { to: '/', label: 'Home', icon: HomeIcon, end: true },
+    { to: '/community', label: 'Community', icon: Users },
+    { to: '/report', label: 'Report an issue', icon: Megaphone },
+    { to: '/track', label: 'Track', icon: Search },
+    { to: '/work', label: 'Past work', icon: Images },
+  ],
+  admin: [
+    { to: '/', label: 'Home', icon: HomeIcon, end: true },
+    { to: '/admin', label: 'Triage', icon: LayoutDashboard, end: true },
+    { to: '/admin/cases', label: 'All cases', icon: Table2 },
+    { to: '/admin/analytics', label: 'Analytics', icon: BarChart3 },
+    { to: '/work', label: 'Past work', icon: Images },
+  ],
+};
 
 function useTheme() {
   const [theme, setTheme] = useState(() => {
@@ -99,25 +128,63 @@ function useLegacyHashRedirect() {
 }
 
 /**
- * Gate for the staff routes.
+ * Gate for every route except the landing page and the two auth screens.
  *
- * This is a CLIENT-SIDE gate, not security — the FastAPI backend still answers
- * unauthenticated requests, so `curl localhost:8000/complaints` returns every
- * reporter's name and phone number whatever this component does. See the note
- * at the top of AuthProvider.jsx.
+ * A signed-out visitor is sent to the landing page, not to the login form. The
+ * landing page is the front door: it explains what this is and carries both
+ * calls to action. Dropping a stranger straight onto a password field asks them
+ * to authenticate to something they have not been told about yet.
  *
- * What it does buy: the dashboard isn't the first thing a stranger sees, and
- * there's one seam to replace when real auth arrives.
+ * The intended destination rides along in the query so the landing page's own
+ * sign-in link can resume it — a deep link to `/complaint/42` still ends up at
+ * `/complaint/42` once you have an account.
+ *
+ * A CLIENT-SIDE gate. It decides what gets rendered, not what the API answers —
+ * `curl localhost:8000/complaints` still returns the list to anyone. What is
+ * genuinely enforced server-side is the admin's write access: verifying a
+ * report or moving a case needs the key only an admin login hands back.
  */
+function useLandingRedirect() {
+  const location = useLocation();
+  const next = encodeURIComponent(location.pathname + location.search);
+  return `/?next=${next}`;
+}
+
 function RequireAuth() {
   const { user } = useAuth();
-  const location = useLocation();
+  const back = useLandingRedirect();
 
-  if (!user) {
-    // Carry the intended destination so signing in resumes it rather than
-    // dumping everyone on the dashboard root.
-    const next = encodeURIComponent(location.pathname + location.search);
-    return <Navigate to={`/login?next=${next}`} replace />;
+  if (!user) return <Navigate to={back} replace />;
+
+  return <Outlet />;
+}
+
+/** Same, for the one account that has the case controls. */
+function RequireAdmin() {
+  const { user, isAdmin } = useAuth();
+  const back = useLandingRedirect();
+
+  if (!user) return <Navigate to={back} replace />;
+
+  if (!isAdmin) {
+    // A signed-in resident is not sent to the login form — they are already
+    // signed in, and bouncing them there suggests the wrong password is the
+    // problem. Say what the rule is instead.
+    return (
+      <div className="page-enter" style={{ maxWidth: 560, margin: '40px auto 0' }}>
+        <div className="card">
+          <EmptyState icon={Lock} title="That area is the administrator's">
+            Case verification and dispatch sit with the corporation&rsquo;s admin account. Your
+            reports and your upvotes are on the community feed.
+          </EmptyState>
+          <div className="card-body" style={{ paddingTop: 0, textAlign: 'center' }}>
+            <Link className="btn btn-primary" to="/community">
+              Back to the feed
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return <Outlet />;
@@ -125,17 +192,22 @@ function RequireAuth() {
 
 function Shell() {
   const toast = useToast();
-  const { user, signOut } = useAuth();
+  const { user, isAdmin, signOut } = useAuth();
   const { loading } = useComplaints();
   const [theme, toggleTheme] = useTheme();
+  const navigate = useNavigate();
 
   useScrollReset();
   useLegacyHashRedirect();
+
+  const nav = user ? (isAdmin ? NAV.admin : NAV.citizen) : NAV.guest;
 
   return (
     <>
       <header className="topbar">
         <div className="shell topbar-inner">
+          {/* Always the landing page, signed in or not — it is the one screen
+              that explains the whole thing, so it stays one click away. */}
           <Link to="/" className="brand" aria-label="CivicFix home" style={{ textDecoration: 'none' }}>
             <span className="brand-mark">
               <ShieldCheck size={18} aria-hidden="true" />
@@ -143,14 +215,14 @@ function Shell() {
             <span>
               <span className="brand-name">CivicFix</span>
               <span className="brand-sub" style={{ display: 'block' }}>
-                Geo-verified civic reporting
+                Report it, back it, watch it get fixed
               </span>
             </span>
           </Link>
 
           <div className="row" style={{ '--gap': '10px' }}>
             <nav className="segmented" aria-label="Sections">
-              {NAV.map((item) => (
+              {nav.map((item) => (
                 <NavLink
                   key={item.to}
                   to={item.to}
@@ -165,9 +237,13 @@ function Shell() {
               ))}
             </nav>
 
-            {user && (
+            {user ? (
               <div className="whoami">
-                <span className="avatar" aria-hidden="true">
+                <span
+                  className="avatar"
+                  aria-hidden="true"
+                  style={isAdmin ? { background: 'var(--c-ok-soft)', color: 'var(--c-ok)' } : undefined}
+                >
                   {initials(user.name)}
                 </span>
                 <span className="whoami-text" style={{ minWidth: 0, lineHeight: 1.2 }}>
@@ -175,7 +251,7 @@ function Shell() {
                     {user.name}
                   </span>
                   <span className="hint" style={{ fontSize: 11 }}>
-                    {user.department}
+                    {isAdmin ? 'Administrator' : user.title || 'Resident'}
                   </span>
                 </span>
                 <button
@@ -183,13 +259,25 @@ function Shell() {
                   className="btn btn-ghost btn-icon"
                   onClick={() => {
                     signOut();
-                    toast.info('Signed out', 'The dashboard is locked again.');
+                    navigate('/');
+                    toast.info('Signed out', 'The feed is still readable — posting and voting are not.');
                   }}
                   aria-label="Sign out"
                   title="Sign out"
                 >
                   <LogOut size={15} />
                 </button>
+              </div>
+            ) : (
+              <div className="row" style={{ '--gap': '8px' }}>
+                <Link className="btn" to="/login">
+                  <LogIn size={15} aria-hidden="true" />
+                  <span className="tab-label">Sign in</span>
+                </Link>
+                <Link className="btn btn-primary" to="/signup">
+                  <UserPlus size={15} aria-hidden="true" />
+                  <span className="tab-label">Sign up</span>
+                </Link>
               </div>
             )}
 
@@ -217,7 +305,7 @@ function Shell() {
       <footer className="footer">
         <div className="shell spread">
           <span>CivicFix — municipal issue tracking</span>
-          <span>Every report carries a GPS fix and a photo.</span>
+          <span>Severity is classified on filing. Priority is severity plus your neighbours.</span>
         </div>
       </footer>
     </>
@@ -260,15 +348,22 @@ export default function App() {
           <ComplaintsProvider>
             <Routes>
               <Route element={<Shell />}>
+                {/* The only three screens a signed-out visitor can reach. */}
                 <Route index element={<Home />} />
-                <Route path="report" element={<ReportRoute />} />
-                <Route path="track" element={<TrackComplaint />} />
-                <Route path="work" element={<PastWorkRoute />} />
-                <Route path="complaint/:id" element={<CitizenComplaintDetails />} />
                 <Route path="login" element={<Login />} />
+                <Route path="signup" element={<Signup />} />
 
-                <Route path="admin" element={<RequireAuth />}>
-                  <Route index element={<AdminDashboard />} />
+                <Route element={<RequireAuth />}>
+                  <Route path="community" element={<Community />} />
+                  <Route path="report" element={<ReportRoute />} />
+                  <Route path="track" element={<TrackComplaint />} />
+                  <Route path="work" element={<PastWorkRoute />} />
+                  <Route path="complaint/:id" element={<CitizenComplaintDetails />} />
+                </Route>
+
+                <Route path="admin" element={<RequireAdmin />}>
+                  <Route index element={<AdminTriage />} />
+                  <Route path="cases" element={<AdminDashboard />} />
                   <Route path="analytics" element={<AdminAnalytics />} />
                   <Route path="case/:id" element={<AdminComplaintDetails />} />
                 </Route>

@@ -11,6 +11,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { createComplaint, readableError } from '../lib/api';
+import { useAuth } from '../lib/authContext';
 import { CATEGORIES } from '../lib/demoData';
 import { useToast } from '../lib/toastContext';
 
@@ -31,6 +32,7 @@ function validate(values, hasPhoto, geoOk) {
 
 export default function ReportForm({ onSubmitted }) {
   const toast = useToast();
+  const { user } = useAuth();
 
   const [values, setValues] = useState(EMPTY);
   const [errors, setErrors] = useState({});
@@ -153,6 +155,10 @@ export default function ReportForm({ onSubmitted }) {
     setSubmitting(true);
     try {
       const res = await createComplaint({
+        // Attached when there's a session, so a formal report shows up on the
+        // feed as yours and can be backed by neighbours like any other post.
+        // The form still works signed out — it is the one route that does.
+        author_id: user?.id ?? null,
         complainant: {
           fullName: values.fullName.trim(),
           phone: values.phone.trim(),

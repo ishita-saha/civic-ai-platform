@@ -6,6 +6,7 @@ import {
   Clock,
   Inbox,
   Layers,
+  LayoutDashboard,
   RefreshCw,
   Search,
   SearchX,
@@ -86,10 +87,11 @@ export default function Dashboard() {
     <div className="stack page-enter" style={{ '--gap': '22px' }}>
       <div className="spread">
         <div>
-          <h2 className="page-title">Operations dashboard</h2>
+          <h2 className="page-title">All cases</h2>
           <p className="page-lede">
-            Every report in one queue, ranked by priority. Open a case to see the reporter&rsquo;s
-            details and move it along.
+            The whole table, sortable and searchable. For the ranked work queue — severity plus
+            resident backing, with the verify and dispatch controls — use{' '}
+            <Link to="/admin">triage</Link>.
           </p>
         </div>
 
@@ -117,6 +119,11 @@ export default function Dashboard() {
               style={{ paddingLeft: 34, width: 230 }}
             />
           </div>
+
+          <Link className="btn" to="/admin">
+            <LayoutDashboard size={15} aria-hidden="true" />
+            Triage
+          </Link>
 
           <Link className="btn" to="/admin/analytics">
             <BarChart3 size={15} aria-hidden="true" />

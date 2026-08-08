@@ -79,3 +79,39 @@ export function statusOf(item) {
   if (/progress|assigned|active/.test(s)) return 'progress';
   return 'pending';
 }
+
+const SEVERITIES = ['critical', 'high', 'moderate', 'low'];
+
+/**
+ * How bad the report is, independent of how popular it is.
+ *
+ * The API classifies this when a report is filed. Older records — and the demo
+ * ones in `demoData.js` — predate the field, so fall back to the priority score
+ * band rather than calling everything "low" and burying a real hazard.
+ */
+export function severityOf(item) {
+  const raw = String(item?.severity || '').toLowerCase();
+  if (SEVERITIES.includes(raw)) return raw;
+
+  const score = Number(item?.priority_score);
+  if (!Number.isFinite(score)) return 'moderate';
+  if (score >= 80) return 'critical';
+  if (score >= 60) return 'high';
+  if (score >= 40) return 'moderate';
+  return 'low';
+}
+
+/** Rank order for sorting — critical first. */
+export function severityRank(item) {
+  return SEVERITIES.indexOf(severityOf(item));
+}
+
+export function upvotesOf(item) {
+  if (Array.isArray(item?.voters)) return item.voters.length;
+  const n = Number(item?.upvotes);
+  return Number.isFinite(n) ? n : 0;
+}
+
+export function hasVoted(item, userId) {
+  return !!userId && Array.isArray(item?.voters) && item.voters.includes(userId);
+}

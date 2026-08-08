@@ -12,7 +12,10 @@ import {
 import BeforeAfter from '../../components/BeforeAfter';
 import CaseTimeline from '../../components/CaseTimeline';
 import EmptyState from '../../components/EmptyState';
+import SeverityBadge from '../../components/SeverityBadge';
 import StatusBadge from '../../components/StatusBadge';
+import UpvoteButton from '../../components/UpvoteButton';
+import { useComplaints } from '../../lib/complaintsContext';
 import { photoPair } from '../../lib/demoData';
 import { coords, mapsUrl, placeName, statusOf, when } from '../../lib/format';
 import { useComplaint } from '../../lib/useComplaint';
@@ -28,7 +31,8 @@ import { useComplaint } from '../../lib/useComplaint';
  */
 export default function ComplaintDetails() {
   const { id } = useParams();
-  const { complaint, loading, error, missing, reload } = useComplaint(id);
+  const { complaint, setComplaint, loading, error, missing, reload } = useComplaint(id);
+  const { patchOne } = useComplaints();
 
   const back = (
     <Link className="backlink" to="/track">
@@ -98,14 +102,30 @@ export default function ComplaintDetails() {
 
       <div className="spread" style={{ alignItems: 'flex-start' }}>
         <div style={{ minWidth: 0 }}>
-          <div className="row" style={{ '--gap': '8px', marginBottom: 6 }}>
+          <div className="row" style={{ '--gap': '8px', marginBottom: 6, flexWrap: 'wrap' }}>
             <span className="mono hint">#{complaint.id}</span>
             <span className="chip">{complaint.category || 'General'}</span>
+            <SeverityBadge item={complaint} />
+            {complaint.verified && (
+              <span className="chip">Verified by {complaint.verified_by || 'the desk'}</span>
+            )}
           </div>
           <h2 className="page-title">{complaint.title || 'Untitled report'}</h2>
           <p className="page-lede">{complaint.description || 'No description was recorded.'}</p>
         </div>
-        <StatusBadge status={status} />
+
+        <div className="row" style={{ '--gap': '12px' }}>
+          {/* Someone who followed a link here from the feed shouldn't have to
+              navigate back to say "me too". */}
+          <UpvoteButton
+            item={complaint}
+            onChanged={(updated) => {
+              setComplaint(updated);
+              patchOne(complaint.id, updated);
+            }}
+          />
+          <StatusBadge status={status} />
+        </div>
       </div>
 
       <div className="detail-grid">
@@ -138,8 +158,9 @@ export default function ComplaintDetails() {
             <div className="card-body">
               <CaseTimeline complaint={complaint} />
               <p className="hint">
-                Stages are inferred from the case&rsquo;s current status — the backend does not yet
-                store a dated history for each step.
+                Filing, verification and closure carry real timestamps. The stage in between is
+                inferred from the case&rsquo;s status — there is no record yet of the hour a crew
+                arrived.
               </p>
             </div>
           </div>
