@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ChevronUp, Loader2 } from 'lucide-react';
 import { readableError, toggleUpvote } from '../lib/api';
 import { hasVoted, upvotesOf } from '../lib/format';
@@ -21,6 +21,12 @@ export default function UpvoteButton({ item, onChanged, size = 'md' }) {
   const toast = useToast();
   const [busy, setBusy] = useState(false);
 
+  // Celebrates adding a vote, never removing one. Taking your backing off a
+  // report should feel like a correction, not an achievement.
+  const [pulse, setPulse] = useState(false);
+  const pulseTimer = useRef(0);
+  useEffect(() => () => clearTimeout(pulseTimer.current), []);
+
   const votes = upvotesOf(item);
   const mine = hasVoted(item, user?.id);
   const ownReport = !!user?.id && item?.author?.id === user.id;
@@ -35,9 +41,15 @@ export default function UpvoteButton({ item, onChanged, size = 'md' }) {
       return;
     }
 
+    const adding = !mine;
     setBusy(true);
     try {
       onChanged?.(await toggleUpvote(item.id, user.id));
+      if (adding) {
+        setPulse(true);
+        clearTimeout(pulseTimer.current);
+        pulseTimer.current = setTimeout(() => setPulse(false), 560);
+      }
     } catch (err) {
       toast.error('Vote not recorded', readableError(err));
     } finally {
@@ -48,7 +60,9 @@ export default function UpvoteButton({ item, onChanged, size = 'md' }) {
   return (
     <button
       type="button"
-      className={`upvote${mine ? ' upvote-on' : ''}${size === 'sm' ? ' upvote-sm' : ''}`}
+      className={`upvote${mine ? ' upvote-on' : ''}${size === 'sm' ? ' upvote-sm' : ''}${
+        pulse ? ' upvote-pulse' : ''
+      }`}
       onClick={press}
       disabled={busy}
       aria-pressed={mine}
@@ -59,7 +73,11 @@ export default function UpvoteButton({ item, onChanged, size = 'md' }) {
       ) : (
         <ChevronUp size={size === 'sm' ? 15 : 17} aria-hidden="true" />
       )}
-      <span className="tnum">{votes}</span>
+      {/* Keyed on the value: React swaps the node when the tally changes, so
+          the new number rolls in rather than blinking from 4 to 5 in place. */}
+      <span className="tnum vote-count" key={votes}>
+        {votes}
+      </span>
       <span className="sr-only">
         {votes === 1 ? '1 person has' : `${votes} people have`} reported this too
       </span>

@@ -330,6 +330,111 @@ h4 {
   }
 }
 
+/* Idle drift for the hero collage. Amplitude and rest angle come in per element
+   as --lift / --tilt / --twist, so one keyframe serves cards and pills at
+   different weights instead of four near-identical copies.
+
+   This animates `transform` and nothing else, which leaves the independent
+   `translate` and `scale` properties free for the pointer parallax and the
+   entrance — three effects on one element, no fight over one property. */
+@keyframes hc-float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(var(--tilt, 0deg));
+  }
+  50% {
+    transform: translateY(calc(var(--lift, 10px) * -1))
+      rotate(calc(var(--tilt, 0deg) + var(--twist, 0.5deg)));
+  }
+}
+
+/* Entrance for the same elements: opacity plus the `scale` property. */
+@keyframes hc-in {
+  from {
+    opacity: 0;
+    scale: 0.9;
+  }
+  to {
+    opacity: 1;
+    scale: 1;
+  }
+}
+
+/* Slow push into the artwork. Paired with `alternate` so it eases back out
+   rather than snapping to the start every cycle. */
+@keyframes ken-burns {
+  from {
+    transform: scale(1.03);
+  }
+  to {
+    transform: scale(1.12) translate3d(-1.6%, -1.4%, 0);
+  }
+}
+
+/* Ambient wash behind the collage. */
+@keyframes aurora {
+  0%,
+  100% {
+    transform: translate3d(-4%, -2%, 0) scale(1);
+    opacity: 0.72;
+  }
+  50% {
+    transform: translate3d(5%, 3%, 0) scale(1.14);
+    opacity: 1;
+  }
+}
+
+/* --- Community feed --- */
+
+/* The chevron kicks up as the vote lands. */
+@keyframes vote-pop {
+  0% {
+    transform: translateY(0) scale(1);
+  }
+  35% {
+    transform: translateY(-5px) scale(1.22);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* A ring leaving the button, once, on the press that adds a vote. */
+@keyframes vote-ring {
+  from {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.55);
+  }
+}
+
+/* The new tally arrives from below, as though the number rolled over. */
+@keyframes count-roll {
+  from {
+    opacity: 0;
+    transform: translateY(7px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Marks a post you just filed, which under "Most backed" lands at the bottom
+   of the feed with nothing else to distinguish it. */
+@keyframes fresh-ring {
+  0%,
+  55% {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--c-brand) 32%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 3px transparent;
+  }
+}
+
 /* `--i` is the stagger index; components set it inline per item. */
 .anim-rise {
   animation: rise var(--t-slow) var(--ease-out) backwards;
@@ -338,6 +443,43 @@ h4 {
 
 .anim-fade {
   animation: fade var(--t-mid) var(--ease-out) backwards;
+}
+
+/* --- Reveal on scroll ---
+   `useReveal` adds `.is-in` once the element crosses into view.
+
+   The hidden half is deliberately nested inside `no-preference`: if it sat at
+   the top level, someone browsing with reduced motion would get a page of
+   permanently invisible sections the moment the observer or the JS failed.
+   Written this way, "no motion" degrades to "everything visible". */
+@media (prefers-reduced-motion: no-preference) {
+  .reveal {
+    opacity: 0;
+    transform: translateY(20px);
+    transition:
+      opacity 600ms var(--ease-out),
+      transform 600ms var(--ease-out);
+  }
+
+  .reveal.is-in {
+    opacity: 1;
+    transform: none;
+  }
+
+  /* Children that should arrive one after another rather than as a block. */
+  .reveal .reveal-item {
+    opacity: 0;
+    transform: translateY(14px);
+    transition:
+      opacity 540ms var(--ease-out),
+      transform 540ms var(--ease-out);
+    transition-delay: calc(var(--i, 0) * 90ms);
+  }
+
+  .reveal.is-in .reveal-item {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 /* Honour the OS setting. Nothing here is load-bearing, so it all just goes. */
@@ -1504,6 +1646,228 @@ select.input {
   margin-top: 26px;
 }
 
+.hero-copy {
+  min-width: 0;
+}
+
+@media (min-width: 900px) {
+  .hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 0.86fr);
+    align-items: center;
+    gap: 34px;
+  }
+}
+
+/* Past this width the hero breaks out of the 820px reading column. The shell
+   offers 1192px at full size, so 820 + 120 either side stays comfortably
+   inside it — the prose keeps its measure, the picture gets room. */
+@media (min-width: 1160px) {
+  .hero {
+    margin-inline: -120px;
+    gap: 48px;
+  }
+}
+
+/* ==========================================================================
+   Hero collage
+   Two case cards drifting over one another, with the backing count and the
+   sign-off floating off their edges. Decorative — <HeroCollage> marks the
+   whole block aria-hidden, since the copy beside it already says all of this.
+   ========================================================================== */
+
+.hero-collage {
+  --px: 0;
+  --py: 0;
+  position: relative;
+  aspect-ratio: 1 / 0.94;
+  isolation: isolate;
+}
+
+@media (max-width: 899px) {
+  .hero-collage {
+    max-width: 400px;
+    margin: 36px auto 0;
+  }
+}
+
+/* Soft wash so the cards sit on something instead of on bare canvas. */
+.hero-collage::before {
+  content: '';
+  position: absolute;
+  inset: -6% -4% 4%;
+  z-index: 0;
+  border-radius: 50%;
+  background:
+    radial-gradient(
+      46% 54% at 32% 34%,
+      color-mix(in srgb, var(--c-brand) 34%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      46% 52% at 70% 68%,
+      color-mix(in srgb, var(--c-ok) 26%, transparent),
+      transparent 72%
+    );
+  filter: blur(40px);
+  opacity: 0.5;
+  animation: aurora 16s ease-in-out infinite;
+}
+
+:root[data-theme='dark'] .hero-collage::before {
+  opacity: 0.62;
+}
+
+.hc-card {
+  position: absolute;
+  z-index: 1;
+  overflow: hidden;
+  border-radius: var(--r-md);
+  border: 1px solid var(--c-line);
+  background: var(--c-surface);
+  box-shadow: var(--e-3);
+  /* Parallax. `translate` rather than `transform`, so the float keyframes keep
+     `transform` to themselves. */
+  translate: calc(var(--px) * var(--depth, 20) * 1px) calc(var(--py) * var(--depth, 20) * 1px);
+  transition: translate 280ms var(--ease-out);
+  animation:
+    hc-in 640ms var(--ease-out) both,
+    hc-float var(--dur, 9s) ease-in-out infinite;
+}
+
+.hc-card img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 3 / 2;
+  object-fit: cover;
+  animation: ken-burns 20s ease-in-out infinite alternate;
+}
+
+.hc-before {
+  top: 0;
+  left: 0;
+  width: 58%;
+  --depth: 16;
+  --tilt: -2.4deg;
+  --lift: 12px;
+  --dur: 9.5s;
+  /* First number delays the entrance, second holds the float until it lands. */
+  animation-delay: 60ms, 700ms;
+}
+
+.hc-after {
+  top: 30%;
+  right: 0;
+  width: 63%;
+  z-index: 2;
+  --depth: 30;
+  --tilt: 2deg;
+  --lift: 16px;
+  --twist: -0.6deg;
+  --dur: 11s;
+  animation-delay: 200ms, 840ms;
+}
+
+.hc-tag {
+  position: absolute;
+  top: 9px;
+  left: 9px;
+  padding: 3px 8px;
+  border-radius: var(--r-xs);
+  background: rgb(12 10 18 / 0.72);
+  color: #fff;
+  font-size: 9.5px;
+  font-weight: 680;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  backdrop-filter: blur(4px);
+}
+
+.hc-tag-done {
+  background: color-mix(in srgb, #15803d 88%, black);
+}
+
+/* Scrim rather than a solid bar — the caption stays readable over the artwork
+   without boxing off the bottom of the picture. */
+.hc-caption {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 20px 10px 8px;
+  background: linear-gradient(to top, rgb(12 10 18 / 0.82), rgb(12 10 18 / 0));
+  color: #fff;
+  font-size: 11.5px;
+  font-weight: 520;
+  line-height: 1.3;
+}
+
+.hc-pill {
+  position: absolute;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: var(--r-full);
+  background: var(--c-surface);
+  border: 1px solid var(--c-line);
+  box-shadow: var(--e-2);
+  color: var(--c-ink-2);
+  font-size: 12px;
+  font-weight: 540;
+  white-space: nowrap;
+  translate: calc(var(--px) * var(--depth, 20) * 1px) calc(var(--py) * var(--depth, 20) * 1px);
+  transition: translate 280ms var(--ease-out);
+  animation:
+    hc-in 640ms var(--ease-out) both,
+    hc-float var(--dur, 7s) ease-in-out infinite;
+}
+
+.hc-pill b {
+  color: var(--c-ink);
+  font-weight: 680;
+  font-variant-numeric: tabular-nums;
+}
+
+.hc-pill svg {
+  color: var(--c-brand);
+  flex: none;
+}
+
+.hc-pill-votes {
+  top: 50%;
+  left: 0;
+  --depth: 44;
+  --tilt: -1.2deg;
+  --lift: 9px;
+  --dur: 7.5s;
+  animation-delay: 340ms, 980ms;
+}
+
+.hc-pill-sev {
+  top: 19%;
+  right: 2%;
+  --depth: 38;
+  --tilt: 1.4deg;
+  --lift: 8px;
+  --dur: 8.5s;
+  animation-delay: 430ms, 1080ms;
+}
+
+/* Static, not pulsing — severity is a fixed property of the problem, and a
+   throbbing dot would imply it is live. Same call <SeverityBadge> makes. */
+.hc-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--c-warn);
+  flex: none;
+}
+
 /* Live counts as a single typographic line, not four boxes. */
 .tally {
   display: flex;
@@ -1643,6 +2007,20 @@ select.input {
   border-radius: var(--r-lg);
   background: var(--c-surface);
   box-shadow: var(--e-1);
+}
+
+/* The landing's worked example drifts; the same <BeforeAfter> in the admin
+   table does not. A thumbnail that moves while someone is reading down a queue
+   is noise, and the two panes there are meant to be compared, not admired.
+
+   The drift owns `transform`, so it supersedes the `.ba-pane:hover img` zoom
+   inside this block — pausing on hover is what replaces it. */
+.case-study .ba-pane img {
+  animation: ken-burns 22s ease-in-out infinite alternate;
+}
+
+.case-study .ba:hover img {
+  animation-play-state: paused;
 }
 
 .case-study-body {
@@ -2121,14 +2499,31 @@ select.input {
    ========================================================================== */
 
 .post {
+  position: relative;
   transition:
     border-color var(--t-mid) ease,
-    box-shadow var(--t-mid) var(--ease-out);
+    box-shadow var(--t-mid) var(--ease-out),
+    transform var(--t-mid) var(--ease-out);
 }
 
 .post:hover {
   border-color: var(--c-line-strong);
   box-shadow: var(--e-2);
+  transform: translateY(-2px);
+}
+
+/* Ring for a post you have just filed.
+
+   On a pseudo-element rather than the card, because the card is already
+   running `.anim-rise` — a second `animation` declaration on the same element
+   replaces the first outright rather than joining it. */
+.post-fresh::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  pointer-events: none;
+  animation: fresh-ring 2.6s var(--ease-out) forwards;
 }
 
 .post-body {
@@ -2173,6 +2568,7 @@ select.input {
    trigger, and it has to read as "pressed" at a glance across a long list. */
 
 .upvote {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -2219,6 +2615,28 @@ select.input {
   width: 38px;
   padding: 5px 0 4px;
   font-size: 13px;
+}
+
+/* --- Vote landed ---
+   Set from React for one beat after a press that *adds* backing, never one
+   that removes it. Withdrawing your support shouldn't come with a flourish. */
+
+.upvote-pulse::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  border: 2px solid var(--c-brand);
+  pointer-events: none;
+  animation: vote-ring 560ms var(--ease-out) forwards;
+}
+
+.upvote-pulse svg {
+  animation: vote-pop 480ms var(--ease-spring);
+}
+
+.vote-count {
+  animation: count-roll var(--t-mid) var(--ease-out);
 }
 
 /* Severity marker — a square, so it is never mistaken for the round status
