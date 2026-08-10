@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-const ADMIN_SECRET_KEY = import.meta.env.VITE_ADMIN_KEY || "civicfix-admin-2026";
+const ADMIN_SECRET_KEY = import.meta.env.VITE_ADMIN_KEY || "spotit-admin-2026";
 
 export default function ProtectedRoute({ children }) {
   const [isAuthenticated, setIsAuthenticated] = useState(

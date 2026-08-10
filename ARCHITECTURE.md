@@ -1,4 +1,4 @@
-# How CivicFix is put together
+# How Spotit is put together
 
 This describes the code as it exists today, not as it is meant to look eventually.
 Where something is planned but unbuilt, it says so. If you are picking this up

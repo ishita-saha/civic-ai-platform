@@ -53,13 +53,13 @@ variable at startup:
 # backend/main.py — replace the literal admin entry in USERS
 import os
 
-ADMIN_EMAIL = os.environ["CIVICFIX_ADMIN_EMAIL"]
-ADMIN_PASSWORD = os.environ["CIVICFIX_ADMIN_PASSWORD"]
+ADMIN_EMAIL = os.environ["SPOTIT_ADMIN_EMAIL"]
+ADMIN_PASSWORD = os.environ["SPOTIT_ADMIN_PASSWORD"]
 
 USERS = [
     {
         "id": "admin-1",
-        "name": os.environ.get("CIVICFIX_ADMIN_NAME", "Administrator"),
+        "name": os.environ.get("SPOTIT_ADMIN_NAME", "Administrator"),
         "email": ADMIN_EMAIL,
         "password": ADMIN_PASSWORD,     # hash this — see §6
         "role": "admin",
@@ -317,7 +317,7 @@ swap the UUID columns for `String` and generate ids in Python. If the answer is
 
 ```bash
 # backend/.env
-DATABASE_URL=postgresql://user:password@host:5432/civicfix
+DATABASE_URL=postgresql://user:password@host:5432/spotit
 ```
 
 ```bash

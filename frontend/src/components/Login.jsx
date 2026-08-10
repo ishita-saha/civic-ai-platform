@@ -33,7 +33,7 @@ import { initials } from '../lib/format';
  * in the README and on this screen precisely so the account can be found when
  * the roster fetch has failed. The password is never hardcoded here.
  */
-const ADMIN_EMAIL = 'ishita@civicfix.gov.in';
+const ADMIN_EMAIL = 'ishita@spotit.gov.in';
 
 const MODES = [
   { key: 'resident', label: 'Resident' },

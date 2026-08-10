@@ -1,5 +1,5 @@
 """
-CivicFix — in-memory API.
+Spotit — in-memory API.
 
 Everything lives in the module-level lists below. Restart the process and it is
 all gone; that is deliberate for a demo build, and it is the reason `models.py`
@@ -27,7 +27,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-app = FastAPI(title="CivicFix API", version="0.3.0")
+app = FastAPI(title="Spotit API", version="0.3.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -40,7 +40,7 @@ app.add_middleware(
 # The admin proves itself with this header. It is handed out once, in the login
 # response for the admin account, so it never sits in the JS bundle the way a
 # hardcoded frontend password would. Still a shared secret — see ARCHITECTURE.md.
-ADMIN_SECRET_KEY = "civicfix-admin-2026"
+ADMIN_SECRET_KEY = "spotit-admin-2026"
 
 
 def now() -> datetime:
@@ -133,7 +133,7 @@ USERS: List[Dict[str, Any]] = [
     {
         "id": "admin-ishita",
         "name": "Ishita",
-        "email": "ishita@civicfix.gov.in",
+        "email": "ishita@spotit.gov.in",
         "password": "admin123",
         "role": "admin",
         "title": "Municipal Commissioner",
@@ -609,5 +609,5 @@ if __name__ == "__main__":
     import uvicorn
 
     port = int(os.environ.get("PORT", 8000))
-    print(f"CivicFix API on http://127.0.0.1:{port}  ·  docs at /docs  ·  Ctrl-C to stop")
+    print(f"Spotit API on http://127.0.0.1:{port}  ·  docs at /docs  ·  Ctrl-C to stop")
     uvicorn.run("main:app", host="127.0.0.1", port=port, reload=True)

@@ -1,8 +1,9 @@
-import { useState } from 'react';
-import { AlertCircle, Crosshair, Loader2, MapPin, Send } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { AlertCircle, Crosshair, Loader2, MapPin, Send, X } from 'lucide-react';
 import { createComplaint, readableError } from '../lib/api';
 import { useAuth } from '../lib/authContext';
 import { CATEGORIES } from '../lib/demoData';
+import { initials } from '../lib/format';
 import { useToast } from '../lib/toastContext';
 
 /**
@@ -29,6 +30,32 @@ export default function PostComposer({ onPosted }) {
   const [coords, setCoords] = useState(null);
   const [locating, setLocating] = useState(false);
   const [busy, setBusy] = useState(false);
+
+  /**
+   * Collapsed until you mean it.
+   *
+   * Four fields sitting open above the feed cost about 400px, which is the
+   * whole first screen — every visit begins by scrolling past a form to reach
+   * the thing you came for. Most visits are reads.
+   *
+   * Opening focuses the headline field, so the click that expands the form is
+   * also the click that starts typing in it. A control that expands and then
+   * makes you aim again has only done half its job.
+   */
+  const [open, setOpen] = useState(false);
+  const titleRef = useRef(null);
+
+  const expand = () => {
+    setOpen(true);
+    requestAnimationFrame(() => titleRef.current?.focus());
+  };
+
+  const collapse = () => {
+    setOpen(false);
+    setValues(EMPTY);
+    setErrors({});
+    setCoords(null);
+  };
 
   const set = (key) => (e) => {
     setValues((v) => ({ ...v, [key]: e.target.value }));
@@ -81,8 +108,7 @@ export default function PostComposer({ onPosted }) {
       });
 
       const record = res?.data ?? res;
-      setValues(EMPTY);
-      setCoords(null);
+      collapse();
       toast.success('Posted to the feed', `Neighbours can back it now — reference #${record?.id}.`);
       onPosted?.(record);
     } catch (err) {
@@ -92,11 +118,35 @@ export default function PostComposer({ onPosted }) {
     }
   };
 
+  if (!open) {
+    return (
+      <div className="card composer-shut">
+        <span className="avatar" aria-hidden="true">
+          {initials(user?.name)}
+        </span>
+        <button type="button" className="composer-prompt" onClick={expand}>
+          Spot something on your street? Raise it here.
+        </button>
+      </div>
+    );
+  }
+
   return (
-    <form className="card" onSubmit={submit} noValidate>
+    <form className="card anim-rise" onSubmit={submit} noValidate>
       <div className="card-head">
         <h3>Raise a problem</h3>
-        <span className="hint">Posting as {user?.name}</span>
+        <div className="row" style={{ '--gap': '10px' }}>
+          <span className="hint">Posting as {user?.name}</span>
+          <button
+            type="button"
+            className="btn btn-ghost btn-icon"
+            onClick={collapse}
+            aria-label="Discard this post"
+            title="Discard"
+          >
+            <X size={15} />
+          </button>
+        </div>
       </div>
 
       <div className="card-body stack" style={{ '--gap': '14px' }}>
@@ -106,6 +156,7 @@ export default function PostComposer({ onPosted }) {
           </label>
           <input
             id="post-title"
+            ref={titleRef}
             className={`input${errors.title ? ' input-invalid' : ''}`}
             value={values.title}
             onChange={set('title')}

@@ -4,14 +4,17 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <title>CivicFix — Report a civic issue</title>
+    <title>Spotit — spot it, back it, watch it get fixed</title>
     <meta
       name="description"
-      content="Report potholes, broken streetlights and sanitation issues with a geo-verified photo, then track them through to resolution."
+      content="Post the pothole, the dark streetlight, the bin nobody emptied. Neighbours back it, severity is classified on filing, and the corporation works the queue in that order."
     />
     <meta name="color-scheme" content="light dark" />
-    <meta name="theme-color" content="#f7f7f5" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#101014" media="(prefers-color-scheme: dark)" />
+    <!-- Match --c-canvas in each theme, not the accent. The browser paints this
+         behind the page on mobile; a saffron strip above a grey app reads as a
+         rendering bug, not as branding. -->
+    <meta name="theme-color" content="#f4f5f6" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0d1013" media="(prefers-color-scheme: dark)" />
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -25,7 +28,7 @@
       // white flash while React boots.
       (function () {
         try {
-          var saved = localStorage.getItem('civicfix.theme');
+          var saved = localStorage.getItem('spotit.theme');
           var dark =
             saved === 'dark' ||
             (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches);

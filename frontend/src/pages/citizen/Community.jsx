@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { MapPin, MessageSquare, RefreshCw, Users } from 'lucide-react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { History, MapPin, MessageSquare, RefreshCw, SearchX, Users, X } from 'lucide-react';
 import EmptyState from '../../components/EmptyState';
 import PostComposer from '../../components/PostComposer';
 import SeverityBadge from '../../components/SeverityBadge';
@@ -31,11 +31,32 @@ function filedAt(c) {
   return Number.isNaN(d.getTime()) ? 0 : d.getTime();
 }
 
+/**
+ * What the topbar search actually searches.
+ *
+ * Title, description, category and place — the four fields a resident would
+ * describe a report by. Deliberately not the author's name: "find everything
+ * my neighbour posted" is not a thing this feed should make easy.
+ *
+ * A bare number matches the case reference, because that is what people paste
+ * in from a confirmation screen.
+ */
+function matches(c, q) {
+  if (/^#?\d+$/.test(q)) return String(c.id) === q.replace('#', '');
+
+  return [c.title, c.description, c.category, placeName(c)]
+    .filter(Boolean)
+    .some((field) => String(field).toLowerCase().includes(q));
+}
+
 export default function Community() {
   const { user } = useAuth();
   const { complaints, loading, refresh, patchOne, addOne } = useComplaints();
   const [sort, setSort] = useState('top');
   const [mineOnly, setMineOnly] = useState(false);
+  const [params, setParams] = useSearchParams();
+
+  const query = (params.get('q') || '').trim().toLowerCase();
 
   // The feed slides cards between ranks instead of cutting to the new order —
   // see useFlip. Attached to the list wrapper below.
@@ -56,7 +77,9 @@ export default function Community() {
   };
 
   const feed = useMemo(() => {
-    const list = complaints.filter((c) => !mineOnly || c.author?.id === user?.id);
+    const list = complaints.filter(
+      (c) => (!mineOnly || c.author?.id === user?.id) && (!query || matches(c, query)),
+    );
 
     const ranked = [...list];
     if (sort === 'top') {
@@ -67,30 +90,19 @@ export default function Community() {
       ranked.sort((a, b) => filedAt(b) - filedAt(a));
     }
     return ranked;
-  }, [complaints, mineOnly, sort, user?.id]);
+  }, [complaints, mineOnly, query, sort, user?.id]);
 
   const backedByMe = complaints.filter((c) => c.voters?.includes(user?.id)).length;
   const mine = complaints.filter((c) => c.author?.id === user?.id).length;
 
   return (
-    <div className="stack page-enter" style={{ '--gap': '20px', maxWidth: 820, margin: '0 auto' }}>
-      <div className="spread" style={{ alignItems: 'flex-start' }}>
-        <div>
-          <h2 className="page-title">Community feed</h2>
-          <p className="page-lede">
-            Everything the neighbourhood has raised. Back the ones you have hit yourself — the
-            count moves a case up the corporation&rsquo;s queue.
-          </p>
-        </div>
-        <button type="button" className="btn" onClick={() => refresh({ announce: true })} disabled={loading}>
-          <RefreshCw size={15} className={loading ? 'spin' : undefined} aria-hidden="true" />
-          Refresh
-        </button>
-      </div>
-
+    <div className="stack page-enter" style={{ '--gap': '14px' }}>
       <PostComposer onPosted={markFresh} />
 
-      <div className="card-head" style={{ padding: 0, border: 0 }}>
+      {/* The sort strip stays put as you scroll. On a long feed, having to
+          scroll back to the top to change the order is the reason people
+          never change the order. */}
+      <div className="feedbar">
         <div className="segmented" role="tablist" aria-label="Sort the feed">
           {SORTS.map((s) => (
             <button
@@ -105,8 +117,8 @@ export default function Community() {
           ))}
         </div>
 
-        <div className="row" style={{ '--gap': '10px' }}>
-          <span className="hint">
+        <div className="row" style={{ '--gap': '8px' }}>
+          <span className="hint tab-label">
             {mine} posted · {backedByMe} backed by you
           </span>
           <button
@@ -118,8 +130,40 @@ export default function Community() {
             <Users size={15} aria-hidden="true" />
             {mineOnly ? 'Showing yours' : 'Only mine'}
           </button>
+          <button
+            type="button"
+            className="btn btn-ghost btn-icon"
+            onClick={() => refresh({ announce: true })}
+            disabled={loading}
+            aria-label="Refresh the feed"
+            title="Refresh the feed"
+          >
+            <RefreshCw size={15} className={loading ? 'spin' : undefined} aria-hidden="true" />
+          </button>
         </div>
       </div>
+
+      {/* A search that silently returns four rows out of forty looks like a
+          feed that has lost thirty-six posts. Say what is being filtered, and
+          put the way out right next to it. */}
+      {query && (
+        <div className="row" style={{ '--gap': '10px', flexWrap: 'wrap' }}>
+          <span className="hint">
+            {feed.length} {feed.length === 1 ? 'report' : 'reports'} matching
+          </span>
+          <button
+            type="button"
+            className="btn"
+            onClick={() => {
+              params.delete('q');
+              setParams(params, { replace: true });
+            }}
+          >
+            &ldquo;{params.get('q')}&rdquo;
+            <X size={14} aria-hidden="true" />
+          </button>
+        </div>
+      )}
 
       {loading && complaints.length === 0 && (
         <div className="stack" style={{ '--gap': '12px' }}>
@@ -137,11 +181,21 @@ export default function Community() {
 
       {!loading && feed.length === 0 && (
         <div className="card">
-          <EmptyState icon={MessageSquare} title={mineOnly ? 'You have not posted yet' : 'Nothing on the feed'}>
-            {mineOnly
-              ? 'Anything you raise shows up here, along with how many neighbours backed it.'
-              : 'Be the first — raise something above and neighbours can back it.'}
-          </EmptyState>
+          {query ? (
+            <EmptyState icon={SearchX} title={`Nothing matching “${params.get('q')}”`}>
+              Searches cover the headline, the description, the category and the street. A bare
+              number is treated as a case reference.
+            </EmptyState>
+          ) : (
+            <EmptyState
+              icon={MessageSquare}
+              title={mineOnly ? 'You have not posted yet' : 'Nothing on the feed'}
+            >
+              {mineOnly
+                ? 'Anything you raise shows up here, along with how many neighbours backed it.'
+                : 'Be the first — raise something above and neighbours can back it.'}
+            </EmptyState>
+          )}
         </div>
       )}
 
@@ -158,32 +212,19 @@ export default function Community() {
                 <UpvoteButton item={c} onChanged={(updated) => patchOne(c.id, updated)} />
               </div>
 
-              <div className="stack" style={{ '--gap': '10px', minWidth: 0 }}>
-                <div className="row" style={{ '--gap': '8px', flexWrap: 'wrap' }}>
-                  <span className="mono hint">#{c.id}</span>
-                  <span className="chip">{c.category || 'General'}</span>
-                  <SeverityBadge item={c} />
-                  <StatusBadge status={statusOf(c)} />
-                  {c.verified && <span className="chip">Verified by {c.verified_by || 'the desk'}</span>}
-                </div>
-
-                <h3 style={{ fontSize: 16 }}>{c.title || 'Untitled report'}</h3>
-
-                {c.description && (
-                  <p className="hint" style={{ lineHeight: 1.6, fontSize: 13.5 }}>
-                    {c.description}
-                  </p>
-                )}
-
+              <div className="stack" style={{ '--gap': '9px', minWidth: 0 }}>
+                {/* Who, where and when — before the headline, because on a
+                    feed those three are half of how you decide whether the
+                    headline is even yours to care about. */}
                 <div className="post-meta">
                   <span className="row" style={{ '--gap': '7px' }}>
                     <span className="avatar" aria-hidden="true">
                       {initials(c.author?.name || c.complainant?.fullName)}
                     </span>
-                    <span>
+                    <span style={{ color: 'var(--c-ink-2)', fontWeight: 550 }}>
                       {c.author?.name || c.complainant?.fullName || 'Anonymous'}
-                      {c.author?.id === user?.id && <span className="chip" style={{ marginLeft: 7 }}>You</span>}
                     </span>
+                    {c.author?.id === user?.id && <span className="chip">You</span>}
                   </span>
 
                   <span className="row" style={{ '--gap': '6px' }}>
@@ -191,13 +232,41 @@ export default function Community() {
                     {placeName(c)}
                   </span>
 
-                  <span className="hint tnum" title={when(c.timestamp || c.created_at)}>
+                  <span className="dot" aria-hidden="true" />
+
+                  <span className="tnum" title={when(c.timestamp || c.created_at)}>
                     {ago(c.timestamp || c.created_at) || when(c.timestamp || c.created_at)}
                   </span>
+                </div>
 
-                  <Link className="row" style={{ '--gap': '5px', fontSize: 13 }} to={`/complaint/${encodeURIComponent(c.id)}`}>
+                <h3 style={{ fontSize: 16.5 }}>{c.title || 'Untitled report'}</h3>
+
+                {c.description && (
+                  <p className="hint" style={{ lineHeight: 1.6, fontSize: 13.5 }}>
+                    {c.description}
+                  </p>
+                )}
+
+                {/* Classification below the text it was derived from, not
+                    above it — these are the desk's reading of the post, and
+                    they should not be the first thing you read instead. */}
+                <div className="row" style={{ '--gap': '8px', flexWrap: 'wrap' }}>
+                  <span className="chip">{c.category || 'General'}</span>
+                  <SeverityBadge item={c} />
+                  <StatusBadge status={statusOf(c)} />
+                  {c.verified && <span className="chip">Verified by {c.verified_by || 'the desk'}</span>}
+                </div>
+
+                <div className="post-actions">
+                  <Link className="post-action" to={`/complaint/${encodeURIComponent(c.id)}`}>
+                    <History size={15} aria-hidden="true" />
                     See the history
                   </Link>
+                  {/* The reference, not an action — so it does not get the pill
+                      treatment that would make it look pressable. */}
+                  <span className="mono hint" style={{ marginLeft: 6, fontSize: 12 }}>
+                    #{c.id}
+                  </span>
                 </div>
               </div>
             </div>

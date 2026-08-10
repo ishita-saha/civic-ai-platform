@@ -9,6 +9,7 @@ import {
   Routes,
   useLocation,
   useNavigate,
+  useSearchParams,
 } from 'react-router-dom';
 import {
   BarChart3,
@@ -22,21 +23,22 @@ import {
   Megaphone,
   Moon,
   Search,
-  ShieldCheck,
   Sun,
   Table2,
   UserPlus,
   Users,
+  X,
 } from 'lucide-react';
 import { AuthProvider } from './components/AuthProvider';
 import { ComplaintsProvider } from './components/ComplaintsProvider';
 import EmptyState from './components/EmptyState';
+import Logo from './components/Logo';
 import PastWork from './components/PastWork';
 import ReportForm from './components/ReportForm';
 import { ToastProvider } from './components/Toast';
 import { useAuth } from './lib/authContext';
 import { useComplaints } from './lib/complaintsContext';
-import { initials } from './lib/format';
+import { initials, statusOf, upvotesOf } from './lib/format';
 import { useToast } from './lib/toastContext';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
@@ -58,35 +60,74 @@ import TrackComplaint from './pages/citizen/TrackComplaint';
  * A signed-out visitor gets no nav at all. Every destination behind it needs an
  * account, and a row of links that all bounce back to where you started is
  * worse than no row.
+ *
+ * Grouped, and the groups are titled. Flat, these are nine links of equal
+ * weight; grouped, they say what the app is — a place you read, a thing you
+ * file, a record you check. That is worth two lines of chrome.
  */
 const NAV = {
   guest: [],
   citizen: [
-    { to: '/', label: 'Home', icon: HomeIcon, end: true },
-    { to: '/community', label: 'Community', icon: Users },
-    { to: '/report', label: 'Report an issue', icon: Megaphone },
-    { to: '/track', label: 'Track', icon: Search },
-    { to: '/work', label: 'Past work', icon: Images },
+    {
+      label: 'Feeds',
+      items: [
+        { to: '/', label: 'Home', icon: HomeIcon, end: true },
+        { to: '/community', label: 'Community', icon: Users },
+      ],
+    },
+    {
+      label: 'Your reports',
+      items: [
+        { to: '/report', label: 'Report an issue', icon: Megaphone },
+        { to: '/track', label: 'Track a case', icon: Search },
+      ],
+    },
+    {
+      label: 'The record',
+      items: [{ to: '/work', label: 'Past work', icon: Images }],
+    },
   ],
   admin: [
-    { to: '/', label: 'Home', icon: HomeIcon, end: true },
-    { to: '/admin', label: 'Triage', icon: LayoutDashboard, end: true },
-    { to: '/admin/cases', label: 'All cases', icon: Table2 },
-    { to: '/admin/analytics', label: 'Analytics', icon: BarChart3 },
-    { to: '/work', label: 'Past work', icon: Images },
+    {
+      label: 'Feeds',
+      items: [
+        { to: '/', label: 'Home', icon: HomeIcon, end: true },
+        { to: '/community', label: 'Community', icon: Users },
+      ],
+    },
+    {
+      label: 'The desk',
+      items: [
+        { to: '/admin', label: 'Triage queue', icon: LayoutDashboard, end: true },
+        { to: '/admin/cases', label: 'All cases', icon: Table2 },
+        { to: '/admin/analytics', label: 'Analytics', icon: BarChart3 },
+      ],
+    },
+    {
+      label: 'The record',
+      items: [{ to: '/work', label: 'Past work', icon: Images }],
+    },
   ],
 };
 
+/**
+ * The landing page and the two auth screens run full-bleed. They are read
+ * rather than worked in, and wrapping a marketing hero in a navigation rail
+ * that points at pages you cannot open yet is how a front door ends up
+ * looking like a settings screen.
+ */
+const BARE = new Set(['/', '/login', '/signup']);
+
 function useTheme() {
   const [theme, setTheme] = useState(() => {
-    const saved = localStorage.getItem('civicfix.theme');
+    const saved = localStorage.getItem('spotit.theme');
     if (saved === 'light' || saved === 'dark') return saved;
     return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   });
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
-    localStorage.setItem('civicfix.theme', theme);
+    localStorage.setItem('spotit.theme', theme);
   }, [theme]);
 
   return [theme, () => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))];
@@ -190,17 +231,167 @@ function RequireAdmin() {
   return <Outlet />;
 }
 
+/**
+ * The topbar search. It is a real control, not a decoration: it puts `?q=` on
+ * the community feed, which is the only screen with enough rows to be worth
+ * searching.
+ *
+ * Kept uncontrolled-ish on purpose — local state while you type, committed on
+ * submit. Filtering the feed on every keystroke means the list reflows under
+ * the cursor, and the one thing worse than not finding your post is watching
+ * it move while you look for it.
+ */
+function SearchBox() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [params] = useSearchParams();
+  const active = params.get('q') || '';
+  const [term, setTerm] = useState(active);
+
+  // Someone else can change the query — the clear button on the feed, a back
+  // navigation. Follow it, or the box keeps showing a search that has ended.
+  useEffect(() => setTerm(active), [active, location.pathname]);
+
+  const submit = (e) => {
+    e.preventDefault();
+    const q = term.trim();
+    navigate(q ? `/community?q=${encodeURIComponent(q)}` : '/community');
+  };
+
+  return (
+    <form className="searchbar" role="search" onSubmit={submit}>
+      <Search size={16} className="search-icon" aria-hidden="true" />
+      <input
+        type="search"
+        value={term}
+        onChange={(e) => setTerm(e.target.value)}
+        placeholder="Search the feed — a street, a pothole, a case number"
+        aria-label="Search reports"
+      />
+      {term && (
+        <button
+          type="button"
+          className="search-clear"
+          onClick={() => {
+            setTerm('');
+            if (active) navigate('/community');
+          }}
+          aria-label="Clear search"
+        >
+          <X size={14} />
+        </button>
+      )}
+    </form>
+  );
+}
+
+function SideNav({ groups }) {
+  return (
+    <nav className="sidenav" aria-label="Sections">
+      {groups.map((group) => (
+        <div className="sidenav-group" key={group.label}>
+          <span className="sidenav-label">{group.label}</span>
+          {group.items.map((item) => (
+            <NavLink key={item.to} to={item.to} end={item.end}>
+              <item.icon size={17} aria-hidden="true" />
+              {item.label}
+            </NavLink>
+          ))}
+        </div>
+      ))}
+
+      <p className="sidenav-note">
+        Kolkata Municipal Corporation pilot. Reports are public; the desk&rsquo;s decisions on them
+        are too.
+      </p>
+    </nav>
+  );
+}
+
+/**
+ * The right column. Everything in it is context you read once and then stop
+ * seeing — what this place is, how big it is, what the rules are.
+ *
+ * Nothing here is a control. If an action lives out at the edge of a 1340px
+ * layout, it is an action nobody on a laptop will ever find.
+ */
+function SideRail() {
+  const { complaints } = useComplaints();
+  const { isAdmin } = useAuth();
+
+  const resolved = complaints.filter((c) => statusOf(c) === 'resolved').length;
+  const backing = complaints.reduce((sum, c) => sum + upvotesOf(c), 0);
+
+  return (
+    <aside className="rail">
+      <div className="rail-card">
+        <div className="rail-card-flag" aria-hidden="true" />
+        <div className="rail-body">
+          <h4>About Spotit</h4>
+          <p>
+            One shared feed for everything the neighbourhood has raised. Spot it, post it, and back
+            what your neighbours have already found — the count is half of what decides the order
+            the corporation works in.
+          </p>
+        </div>
+
+        <div className="rail-stats">
+          <div className="rail-stat">
+            <b>{complaints.length}</b>
+            <span>problems raised</span>
+          </div>
+          <div className="rail-stat">
+            <b>{backing}</b>
+            <span>times backed</span>
+          </div>
+          <div className="rail-stat">
+            <b>{resolved}</b>
+            <span>closed with proof</span>
+          </div>
+          <div className="rail-stat">
+            <b>1</b>
+            <span>municipal account</span>
+          </div>
+        </div>
+
+        <div className="rail-body">
+          <Link className="btn btn-primary" to={isAdmin ? '/admin' : '/report'}>
+            {isAdmin ? 'Open the triage queue' : 'Report an issue'}
+          </Link>
+        </div>
+      </div>
+
+      <div className="rail-card">
+        <div className="rail-body">
+          <h4>How the queue is ordered</h4>
+          <ol className="rail-rules">
+            <li>Severity is classified from the words in the report, not from who filed it.</li>
+            <li>Backing is one press per account. The bonus is capped, so popular never outranks dangerous.</li>
+            <li>Nothing is dispatched before the desk has verified it is real.</li>
+            <li>A case closes with a photo of the finished work, or it does not close.</li>
+          </ol>
+        </div>
+      </div>
+    </aside>
+  );
+}
+
 function Shell() {
   const toast = useToast();
   const { user, isAdmin, signOut } = useAuth();
   const { loading } = useComplaints();
   const [theme, toggleTheme] = useTheme();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
 
   useScrollReset();
   useLegacyHashRedirect();
 
-  const nav = user ? (isAdmin ? NAV.admin : NAV.citizen) : NAV.guest;
+  const groups = user ? (isAdmin ? NAV.admin : NAV.citizen) : NAV.guest;
+
+  // Signed out, or on the front door: no columns. The grid only earns its
+  // keep once there is a feed to put in the middle of it.
+  const bare = !user || BARE.has(pathname);
 
   return (
     <>
@@ -208,66 +399,61 @@ function Shell() {
         <div className="shell topbar-inner">
           {/* Always the landing page, signed in or not — it is the one screen
               that explains the whole thing, so it stays one click away. */}
-          <Link to="/" className="brand" aria-label="CivicFix home" style={{ textDecoration: 'none' }}>
+          <Link to="/" className="brand" aria-label="Spotit home" style={{ textDecoration: 'none' }}>
             <span className="brand-mark">
-              <ShieldCheck size={18} aria-hidden="true" />
+              <Logo size={30} />
             </span>
             <span>
-              <span className="brand-name">CivicFix</span>
+              <span className="brand-name">Spotit</span>
               <span className="brand-sub" style={{ display: 'block' }}>
-                Report it, back it, watch it get fixed
+                Spot it. Back it. Watch it get fixed.
               </span>
             </span>
           </Link>
 
-          <div className="row" style={{ '--gap': '10px' }}>
-            <nav className="segmented" aria-label="Sections">
-              {nav.map((item) => (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  end={item.end}
-                  // The visible label is hidden on narrow screens, so the name
-                  // has to live on the link itself.
-                  aria-label={item.label}
-                >
-                  <item.icon size={15} aria-hidden="true" />
-                  <span className="tab-label">{item.label}</span>
-                </NavLink>
-              ))}
-            </nav>
+          {user && <SearchBox />}
 
+          <div className="topbar-actions">
             {user ? (
-              <div className="whoami">
-                <span
-                  className="avatar"
-                  aria-hidden="true"
-                  style={isAdmin ? { background: 'var(--c-ok-soft)', color: 'var(--c-ok)' } : undefined}
-                >
-                  {initials(user.name)}
-                </span>
-                <span className="whoami-text" style={{ minWidth: 0, lineHeight: 1.2 }}>
-                  <span style={{ display: 'block', fontSize: 13, fontWeight: 560, color: 'var(--c-ink)' }}>
-                    {user.name}
+              <>
+                {!isAdmin && (
+                  <Link className="btn btn-primary" to="/report">
+                    <Megaphone size={15} aria-hidden="true" />
+                    <span className="tab-label">Report</span>
+                  </Link>
+                )}
+
+                <div className="whoami">
+                  <span
+                    className="avatar"
+                    aria-hidden="true"
+                    style={isAdmin ? { background: 'var(--c-ok-soft)', color: 'var(--c-ok)' } : undefined}
+                  >
+                    {initials(user.name)}
                   </span>
-                  <span className="hint" style={{ fontSize: 11 }}>
-                    {isAdmin ? 'Administrator' : user.title || 'Resident'}
+                  <span className="whoami-text" style={{ minWidth: 0, lineHeight: 1.2 }}>
+                    <span style={{ display: 'block', fontSize: 13, fontWeight: 560, color: 'var(--c-ink)' }}>
+                      {user.name}
+                    </span>
+                    <span className="hint" style={{ fontSize: 11 }}>
+                      {isAdmin ? 'Administrator' : user.title || 'Resident'}
+                    </span>
                   </span>
-                </span>
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-icon"
-                  onClick={() => {
-                    signOut();
-                    navigate('/');
-                    toast.info('Signed out', 'The feed is still readable — posting and voting are not.');
-                  }}
-                  aria-label="Sign out"
-                  title="Sign out"
-                >
-                  <LogOut size={15} />
-                </button>
-              </div>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-icon"
+                    onClick={() => {
+                      signOut();
+                      navigate('/');
+                      toast.info('Signed out', 'The feed is still readable — posting and voting are not.');
+                    }}
+                    aria-label="Sign out"
+                    title="Sign out"
+                  >
+                    <LogOut size={15} />
+                  </button>
+                </div>
+              </>
             ) : (
               <div className="row" style={{ '--gap': '8px' }}>
                 <Link className="btn" to="/login">
@@ -293,18 +479,24 @@ function Shell() {
           </div>
         </div>
 
-        {loading && <div className="progress" aria-hidden="true" />}
+        {/* The flag rule, or — while the feed is loading — a sweep across it.
+            Same 2px, so nothing below it moves when loading starts. */}
+        {loading ? <div className="progress" aria-hidden="true" /> : <div className="flagline" aria-hidden="true" />}
       </header>
 
       <main className="page">
-        <div className="shell">
-          <Outlet />
+        <div className={`shell ${bare ? 'layout-wide' : 'layout'}`}>
+          {!bare && <SideNav groups={groups} />}
+          <div style={{ minWidth: 0 }}>
+            <Outlet />
+          </div>
+          {!bare && <SideRail />}
         </div>
       </main>
 
       <footer className="footer">
         <div className="shell spread">
-          <span>CivicFix — municipal issue tracking</span>
+          <span>Spotit — municipal issue tracking for the KMC pilot</span>
           <span>Severity is classified on filing. Priority is severity plus your neighbours.</span>
         </div>
       </footer>
