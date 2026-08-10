@@ -1,4 +1,4 @@
-# CivicFix
+# Spotit
 
 A civic issue reporting tool. You photograph the pothole, your phone stamps
 where you were standing, and the report lands in a queue a ward office can
@@ -122,7 +122,7 @@ straight in. There is exactly one administrator:
 
 | Role | Email | Password |
 |---|---|---|
-| Administrator | `ishita@civicfix.gov.in` | `admin123` |
+| Administrator | `ishita@spotit.gov.in` | `admin123` |
 | Resident | `aritra@demo.in` | `civic123` |
 | Resident | `priya@demo.in` | `civic123` |
 | Resident | `farhan@demo.in` | `civic123` |

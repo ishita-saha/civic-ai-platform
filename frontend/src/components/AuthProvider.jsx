@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import * as api from '../lib/api';
 import { AuthContext } from '../lib/authContext';
 
-const SESSION_KEY = 'civicfix.session';
+const SESSION_KEY = 'spotit.session';
 
 /**
  * ============================ READ THIS ============================

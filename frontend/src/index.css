@@ -1,40 +1,72 @@
 /* ==========================================================================
-   CivicFix — design system
+   Spotit — design system
    Tokens first, then reset, then primitives. Components style themselves
    from these tokens only; no component should invent a raw hex value.
+
+   The palette does two jobs at once and they pull in opposite directions.
+
+   The *structure* is a forum's: a near-neutral canvas, white cards, one warm
+   accent that carries every call to action. Colour is scarce on purpose —
+   a feed is a wall of text, and text is only scannable when the surrounding
+   chrome shuts up.
+
+   The *identity* is the tricolour. Saffron is the accent, so it does the
+   loudest work already; India green carries "done, verified, closed"; the
+   chakra blue carries "information, in flight, official". White is the card,
+   not a decoration. That mapping is semantic, not ornamental, which is why it
+   survives the theme flip — in dark mode the three hues are re-picked against
+   the dark surface rather than dimmed, but they stay saffron, green and blue,
+   in that order, doing those same three jobs.
+
+   Two saffron ramps, and the split matters. `--c-brand` is the *functional*
+   one: it passes 4.5:1 on the card, so it may be text, a 1px border, a small
+   icon. `--c-tri-1` is the *display* one: full-chroma flag saffron, legible
+   only at size — the mark, the flag rule, a gradient. Reaching for the display
+   token to colour 13px type is the mistake this split exists to prevent.
    ========================================================================== */
 
 :root {
-  /* --- Neutrals. Warm-grey ramp; the canvas is off-white, not pure white,
-         so white cards actually read as raised surfaces. --- */
-  --c-canvas: #f7f7f5;
+  /* --- Neutrals. A hair cool, so the saffron reads warm against them. The
+         canvas is grey, not white, or the cards have nothing to sit on. --- */
+  --c-canvas: #f4f5f6;
   --c-surface: #ffffff;
-  --c-surface-2: #fbfbfa;
-  --c-surface-3: #f2f2ef;
-  --c-line: #e6e5e1;
-  --c-line-strong: #d6d5d0;
+  --c-surface-2: #fafafb;
+  --c-surface-3: #eef0f2;
+  --c-line: #e2e5e8;
+  --c-line-strong: #cdd2d7;
 
-  --c-ink: #17161a;
-  --c-ink-2: #4a4852;
-  --c-ink-3: #77747f;
-  --c-ink-4: #a3a0a9;
+  --c-ink: #14161a;
+  --c-ink-2: #45494f;
+  --c-ink-3: #6e747c;
+  --c-ink-4: #9aa0a8;
 
-  /* --- Brand. Indigo reads civic/institutional without going full
-         municipal-website blue. --- */
-  --c-brand: #4f46e5;
-  --c-brand-hover: #4338ca;
-  --c-brand-soft: #eef2ff;
-  --c-brand-ink: #3730a3;
+  /* --- Brand: flag saffron, taken down to the darkest tone that still reads
+         orange rather than brown, because it has to work as 13px text on a
+         white card. Everything above that lightness fails the contrast floor
+         and belongs to --c-tri-1 instead. --- */
+  --c-brand: #c9480a;
+  --c-brand-hover: #a93c08;
+  --c-brand-soft: #fff2e8;
+  --c-brand-ink: #93330a;
 
-  /* --- Semantics, one soft + one strong per state --- */
-  --c-warn: #b45309;
-  --c-warn-soft: #fef4e6;
-  --c-info: #1d4ed8;
-  --c-info-soft: #eaf0ff;
-  --c-ok: #15803d;
-  --c-ok-soft: #e9f7ee;
-  --c-danger: #b91c1c;
-  --c-danger-soft: #fdeceb;
+  /* --- The flag, as display colour. Never type. --- */
+  --c-tri-1: #ff8f2e; /* saffron    */
+  --c-tri-2: #ffffff; /* white band */
+  --c-tri-3: #1a9c4f; /* green      */
+  --c-tri-4: #13418f; /* chakra     */
+
+  /* --- Semantics. Green and blue are the flag's, which is the point: a
+         resolved case and a dispatched one are the two states worth a hue.
+         Danger stays a true red — near enough to saffron to need saying, so:
+         it is always crimson and always carries a label, never a bare dot. --- */
+  --c-warn: #9a6206;
+  --c-warn-soft: #fdf4e3;
+  --c-info: #1a4fa0;
+  --c-info-soft: #e9effa;
+  --c-ok: #138808;
+  --c-ok-soft: #e7f5e6;
+  --c-danger: #b3261e;
+  --c-danger-soft: #fdecea;
 
   /* --- Chart palettes. ---------------------------------------------------
          Categorical: six fixed slots, assigned by category identity and never
@@ -48,24 +80,26 @@
          the dark surface below. Changing one means re-running that check;
          "it looks fine" is not the same test.
 
-         Adjacent deutan separation lands in the 6–8 warning band, which is
-         only permissible because every bar carries a direct text label. Do
-         not remove those labels. --- */
-  --c-cat-1: #4f46e5; /* Roads       */
-  --c-cat-2: #0d9488; /* Sanitation  */
-  --c-cat-3: #a16207; /* Lighting    */
-  --c-cat-4: #be185d; /* Water       */
-  --c-cat-5: #0369a1; /* Drainage    */
-  --c-cat-6: #4d7c0f; /* Other       */
+         Re-picked for the tricolour, and the re-pick cost something: saffron
+         and the gold of slot 3 are the tight pair, separated by lightness
+         (0.20 vs 0.26) rather than by hue, and under deuteranopia that is all
+         they have. They are not adjacent slots, and every mark carries a
+         direct text label. Do not remove those labels. --- */
+  --c-cat-1: #cc4b0a; /* Roads       */
+  --c-cat-2: #15803d; /* Sanitation  */
+  --c-cat-3: #b58105; /* Lighting    */
+  --c-cat-4: #1a4fa0; /* Water       */
+  --c-cat-5: #a72693; /* Drainage    */
+  --c-cat-6: #5b6472; /* Other       */
 
   /* Sequential, one hue light→dark, for priority bands — magnitude, not
      identity, so a ramp rather than six unrelated hues. */
-  --c-seq-1: #96a4fb;
-  --c-seq-2: #7d8bf6;
-  --c-seq-3: #4f46e5;
-  --c-seq-4: #3730a3;
+  --c-seq-1: #fbc79a;
+  --c-seq-2: #f2924f;
+  --c-seq-3: #cc4b0a;
+  --c-seq-4: #8a3005;
 
-  --c-grid: #eeeeea;
+  --c-grid: #e9ebed;
 
   /* --- Elevation. Layered shadows; a single blur reads flat and cheap. --- */
   --e-1: 0 1px 2px rgb(20 18 30 / 0.05), 0 1px 1px rgb(20 18 30 / 0.03);
@@ -93,7 +127,12 @@
   --t-mid: 220ms;
   --t-slow: 420ms;
 
-  --shell: 1240px;
+  /* Wide enough for nav + feed + rail without the feed itself getting wide —
+     a measure past ~75ch is where a wall of posts stops being scannable, so
+     the extra width all goes to the two side columns. */
+  --shell: 1340px;
+  --col-nav: 232px;
+  --col-rail: 312px;
 
   color-scheme: light;
   font-family: var(--f-sans);
@@ -106,50 +145,63 @@
 }
 
 :root[data-theme='dark'] {
-  --c-canvas: #101014;
-  --c-surface: #17171c;
-  --c-surface-2: #1c1c22;
-  --c-surface-3: #232329;
-  --c-line: #2a2a32;
-  --c-line-strong: #3a3a44;
+  --c-canvas: #0d1013;
+  --c-surface: #14181c;
+  --c-surface-2: #191e23;
+  --c-surface-3: #212830;
+  --c-line: #272e35;
+  --c-line-strong: #38424c;
 
-  --c-ink: #f4f4f6;
-  --c-ink-2: #b8b6c0;
-  --c-ink-3: #8b8996;
-  --c-ink-4: #64626e;
+  --c-ink: #f1f3f5;
+  --c-ink-2: #b5bdc5;
+  --c-ink-3: #88919b;
+  --c-ink-4: #616a74;
 
-  --c-brand: #818cf8;
-  --c-brand-hover: #a5b4fc;
-  --c-brand-soft: #21213a;
-  --c-brand-ink: #c7d2fe;
+  /* The light theme's saffron had to be darkened to survive a white card. On
+     ink it has the opposite problem, so it goes the other way — back up to
+     something much closer to the flag's own colour. Dark mode is where this
+     palette actually gets to look like the flag. */
+  --c-brand: #ff7a2f;
+  --c-brand-hover: #ff9455;
+  --c-brand-soft: #2b1a10;
+  --c-brand-ink: #ffb181;
 
-  --c-warn: #fbbf24;
-  --c-warn-soft: #2e2415;
-  --c-info: #7ea6ff;
-  --c-info-soft: #16203a;
-  --c-ok: #4ade80;
-  --c-ok-soft: #14291d;
-  --c-danger: #f87171;
-  --c-danger-soft: #2e1a1a;
+  --c-tri-1: #ff9a45;
+  /* Not #fff. The white band next to two saturated hues on a near-black
+     ground vibrates; pulling it to a warm off-white settles it, and it still
+     reads unambiguously as the middle band. */
+  --c-tri-2: #eceff2;
+  --c-tri-3: #35c072;
+  --c-tri-4: #6f9dee;
+
+  --c-warn: #e0a63a;
+  --c-warn-soft: #2a2110;
+  --c-info: #7aa7f5;
+  --c-info-soft: #141d31;
+  --c-ok: #4ec97b;
+  --c-ok-soft: #102619;
+  --c-danger: #f4776b;
+  --c-danger-soft: #2d1917;
 
   /* Dark chart steps are re-picked against the dark surface, not brightened
      copies of the light ones — an automatic flip fails the separation checks
-     (the light set's teal/magenta pair collapses to ΔE 1.8 under deuteranopia
-     once lifted). Same slot order, so a category keeps its identity across
-     themes even though the hex changes. */
-  --c-cat-1: #6d78ec;
-  --c-cat-2: #12a595;
-  --c-cat-3: #b5842f;
-  --c-cat-4: #d9538d;
-  --c-cat-5: #4a90e2;
-  --c-cat-6: #6d9a28;
+     (the light set's magenta/slate pair collapses under deuteranopia once
+     lifted, and saffron goes chalky before it goes bright). Same slot order,
+     so a category keeps its identity across themes even though the hex
+     changes. */
+  --c-cat-1: #ff7f3f;
+  --c-cat-2: #3fb56d;
+  --c-cat-3: #d3a338;
+  --c-cat-4: #6fa2f2;
+  --c-cat-5: #e06ac6;
+  --c-cat-6: #8d99a8;
 
-  --c-seq-1: #4f46e5;
-  --c-seq-2: #6366f1;
-  --c-seq-3: #818cf8;
-  --c-seq-4: #c7d2fe;
+  --c-seq-1: #8a3a0c;
+  --c-seq-2: #c2560d;
+  --c-seq-3: #f0813a;
+  --c-seq-4: #ffc39a;
 
-  --c-grid: #23232a;
+  --c-grid: #222a31;
 
   --e-1: 0 1px 2px rgb(0 0 0 / 0.4);
   --e-2: 0 1px 3px rgb(0 0 0 / 0.5), 0 8px 16px -6px rgb(0 0 0 / 0.5);
@@ -581,15 +633,18 @@ h4 {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 9px 15px;
+  padding: 8px 16px;
   border: 1px solid var(--btn-bd);
-  border-radius: var(--r-sm);
+  border-radius: var(--r-full);
   background: var(--btn-bg);
   color: var(--btn-fg);
   font-size: 14px;
   font-weight: 550;
   letter-spacing: -0.006em;
   white-space: nowrap;
+  /* Half these are <Link>s. Without this they arrive underlined from the UA
+     stylesheet, which on a filled pill looks like a rendering fault. */
+  text-decoration: none;
   cursor: pointer;
   box-shadow: var(--e-1);
   transition:
@@ -631,7 +686,7 @@ h4 {
 }
 
 :root[data-theme='dark'] .btn-primary {
-  --btn-fg: #14121f;
+  --btn-fg: #1a1005;
 }
 
 .btn-ghost {
@@ -647,9 +702,9 @@ h4 {
 }
 
 .btn-lg {
-  padding: 13px 22px;
+  padding: 12px 22px;
   font-size: 15px;
-  border-radius: var(--r-md);
+  border-radius: var(--r-full);
 }
 
 .btn-icon {
@@ -668,11 +723,11 @@ h4 {
 .segmented {
   position: relative;
   display: inline-flex;
-  padding: 4px;
+  padding: 3px;
   gap: 2px;
   background: var(--c-surface-3);
   border: 1px solid var(--c-line);
-  border-radius: var(--r-md);
+  border-radius: var(--r-full);
 }
 
 .segmented button,
@@ -682,9 +737,9 @@ h4 {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 15px;
+  padding: 7px 15px;
   border: 0;
-  border-radius: var(--r-sm);
+  border-radius: var(--r-full);
   background: transparent;
   color: var(--c-ink-3);
   font-size: 14px;
@@ -1340,82 +1395,410 @@ select.input {
 
 /* ==========================================================================
    App chrome
+   Three columns: navigation, feed, context. The middle one is the only one
+   that scrolls anywhere — the outer two are sticky and shorter than the
+   viewport, so on a long feed they simply stay put. That is the whole trick
+   of a forum layout, and it stops working the moment a side column grows
+   taller than the screen, so keep them short.
    ========================================================================== */
 
 .topbar {
   position: sticky;
   top: 0;
   z-index: 40;
-  background: color-mix(in srgb, var(--c-surface) 82%, transparent);
-  backdrop-filter: saturate(180%) blur(14px);
-  -webkit-backdrop-filter: saturate(180%) blur(14px);
+  /* Opaque, not frosted. A blur layer over a list that is constantly
+     scrolling repaints the whole strip every frame, and on the feed that is
+     the one thing you can feel. */
+  background: var(--c-surface);
   border-bottom: 1px solid var(--c-line);
 }
 
 .topbar-inner {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  height: 62px;
+  gap: 14px;
+  height: 56px;
 }
 
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  min-width: 0;
+/* The flag, as a 2px rule under the chrome. It is the one piece of decoration
+   in the entire shell, and it earns its place by being the thing you see
+   before you have read a word.
+
+   Hard stops, not a blend: a gradient between saffron and green runs through
+   a muddy olive in the middle, and the middle is supposed to be the white
+   band. */
+.flagline {
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    var(--c-tri-1) 0 33.33%,
+    var(--c-tri-2) 33.33% 66.66%,
+    var(--c-tri-3) 66.66% 100%
+  );
 }
 
-.brand-mark {
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  flex: none;
-  border-radius: 10px;
-  background: linear-gradient(140deg, var(--c-brand), #7c3aed);
-  color: #fff;
-  box-shadow: var(--e-2);
-  transition: transform var(--t-mid) var(--ease-spring);
-}
-
-.brand:hover .brand-mark {
-  transform: rotate(-8deg) scale(1.06);
-}
-
-.brand-name {
-  font-size: 15.5px;
-  font-weight: 640;
-  letter-spacing: -0.02em;
-  line-height: 1.15;
-}
-
-.brand-sub {
-  font-size: 11.5px;
-  color: var(--c-ink-3);
-  line-height: 1.2;
-}
-
-/* Indeterminate loading bar pinned under the topbar. */
+/* Indeterminate loading bar. It rides on top of the flag rule rather than
+   adding a second stripe — one 2px line under the chrome, which is either
+   the flag or, while the feed is loading, a saffron sweep across it. */
 .progress {
   position: absolute;
-  inset: auto 0 -1px 0;
+  inset: auto 0 0 0;
   height: 2px;
   overflow: hidden;
+  background: var(--c-surface-3);
 }
 
 .progress::after {
   content: '';
   display: block;
   height: 100%;
-  background: linear-gradient(90deg, transparent, var(--c-brand), transparent);
+  background: linear-gradient(90deg, transparent, var(--c-tri-1), transparent);
   animation: indeterminate 1.15s ease-in-out infinite;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: none;
+}
+
+.brand-mark {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  color: var(--c-tri-1);
+  transition: transform var(--t-mid) var(--ease-spring);
+}
+
+.brand:hover .brand-mark {
+  transform: scale(1.08);
+}
+
+.brand-name {
+  font-size: 17px;
+  font-weight: 680;
+  letter-spacing: -0.028em;
+  line-height: 1.1;
+  color: var(--c-ink);
+}
+
+.brand-sub {
+  font-size: 11px;
+  color: var(--c-ink-3);
+  line-height: 1.2;
+  letter-spacing: 0;
+}
+
+/* --- Search ---
+   Centre of the bar, because on a site whose whole content is a list of
+   things other people wrote, "find the one about my street" is the second
+   most common intent after "read the feed". */
+
+.searchbar {
+  position: relative;
+  flex: 1;
+  max-width: 540px;
+  margin-inline: auto;
+}
+
+.searchbar input {
+  width: 100%;
+  height: 38px;
+  padding: 0 36px 0 38px;
+  border: 1px solid transparent;
+  border-radius: var(--r-full);
+  background: var(--c-surface-3);
+  color: var(--c-ink);
+  font-size: 14px;
+  transition:
+    background var(--t-fast) ease,
+    border-color var(--t-fast) ease,
+    box-shadow var(--t-fast) ease;
+}
+
+.searchbar input::placeholder {
+  color: var(--c-ink-4);
+}
+
+/* WebKit puts its own clear affordance inside a search input. We draw one, and
+   two of them side by side is the kind of detail that makes a UI look assembled
+   rather than designed. */
+.searchbar input::-webkit-search-cancel-button {
+  appearance: none;
+}
+
+.searchbar input:focus {
+  outline: 0;
+  background: var(--c-surface);
+  border-color: var(--c-brand);
+  box-shadow: var(--e-focus);
+}
+
+.searchbar .search-icon {
+  position: absolute;
+  top: 50%;
+  left: 13px;
+  transform: translateY(-50%);
+  color: var(--c-ink-4);
+  pointer-events: none;
+}
+
+.searchbar .search-clear {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: var(--r-full);
+  background: transparent;
+  color: var(--c-ink-3);
+  cursor: pointer;
+}
+
+.searchbar .search-clear:hover {
+  background: var(--c-line);
+  color: var(--c-ink);
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  margin-left: auto;
+}
+
+/* --- Left column: navigation ---------------------------------------------
+   Sections are grouped and the groups are titled, because the two halves of
+   this app — what residents do, what the desk does — are genuinely different
+   jobs and a flat list of nine links hides that. */
+
+.sidenav {
+  position: sticky;
+  top: 72px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding-bottom: 8px;
+}
+
+.sidenav-group {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.sidenav-label {
+  padding: 0 10px 7px;
+  font-size: 10.5px;
+  font-weight: 640;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--c-ink-4);
+}
+
+.sidenav a {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 9px 12px;
+  border-radius: var(--r-sm);
+  color: var(--c-ink-2);
+  font-size: 14px;
+  font-weight: 520;
+  text-decoration: none;
+  transition:
+    background var(--t-fast) ease,
+    color var(--t-fast) ease;
+}
+
+.sidenav a svg {
+  flex: none;
+  color: var(--c-ink-4);
+  transition: color var(--t-fast) ease;
+}
+
+.sidenav a:hover {
+  background: var(--c-surface-3);
+  color: var(--c-ink);
+}
+
+.sidenav a:hover svg {
+  color: var(--c-ink-2);
+}
+
+.sidenav a[aria-current='page'] {
+  background: var(--c-brand-soft);
+  color: var(--c-brand-ink);
+  font-weight: 620;
+}
+
+.sidenav a[aria-current='page'] svg {
+  color: var(--c-brand);
+}
+
+/* Saffron marker on the current item. Short, centred, and only on the active
+   one — the nav should be findable at a glance without being a colour chart. */
+.sidenav a[aria-current='page']::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 3px;
+  height: 18px;
+  margin-top: -9px;
+  border-radius: 0 var(--r-full) var(--r-full) 0;
+  background: var(--c-tri-1);
+}
+
+.sidenav-note {
+  padding: 0 12px;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--c-ink-4);
+}
+
+/* --- Right column: context ------------------------------------------------
+   Never controls. Everything here is something you read once and then stop
+   seeing; anything you have to click to get your work done belongs in the
+   middle column where your eyes already are. */
+
+.rail {
+  position: sticky;
+  top: 72px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.rail-card {
+  overflow: hidden;
+  background: var(--c-surface);
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-lg);
+}
+
+/* The flag reappears here, as the cap on the context card. Same three bands,
+   same order — one motif used twice beats two motifs used once. */
+.rail-card-flag {
+  height: 3px;
+  background: linear-gradient(
+    90deg,
+    var(--c-tri-1) 0 33.33%,
+    var(--c-tri-2) 33.33% 66.66%,
+    var(--c-tri-3) 66.66% 100%
+  );
+}
+
+.rail-card h4 {
+  font-size: 13px;
+  letter-spacing: 0.01em;
+}
+
+.rail-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 15px 16px;
+}
+
+.rail-body p {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--c-ink-3);
+}
+
+/* Two-up counters. Tabular figures so the numbers do not jitter as the feed
+   refreshes underneath them. */
+.rail-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: var(--c-line);
+  border-block: 1px solid var(--c-line);
+}
+
+.rail-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 16px;
+  background: var(--c-surface);
+}
+
+.rail-stat b {
+  font-size: 19px;
+  font-weight: 660;
+  letter-spacing: -0.02em;
+  color: var(--c-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.rail-stat span {
+  font-size: 11.5px;
+  color: var(--c-ink-3);
+}
+
+.rail-rules {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: rule;
+}
+
+.rail-rules li {
+  display: flex;
+  gap: 10px;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--c-ink-3);
+}
+
+.rail-rules li::before {
+  counter-increment: rule;
+  content: counter(rule);
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--r-full);
+  background: var(--c-surface-3);
+  color: var(--c-ink-3);
+  font-size: 10.5px;
+  font-weight: 660;
+}
+
+/* --- The grid ------------------------------------------------------------- */
+
+.layout {
+  display: grid;
+  grid-template-columns: var(--col-nav) minmax(0, 1fr) var(--col-rail);
+  gap: 26px;
+  align-items: start;
+}
+
+/* Landing and the auth screens: one column, no chrome around it. They are
+   read, not worked in. */
+.layout-wide {
+  display: block;
 }
 
 .page {
   flex: 1;
-  padding: 28px 0 64px;
+  padding: 22px 0 64px;
 }
 
 .page-enter {
@@ -1423,7 +1806,7 @@ select.input {
 }
 
 .page-title {
-  font-size: 25px;
+  font-size: 23px;
   letter-spacing: -0.028em;
 }
 
@@ -1434,11 +1817,118 @@ select.input {
   max-width: 62ch;
 }
 
+/* Sticky sort/filter strip over the feed. Sits under the topbar and takes the
+   canvas with it, so posts slide underneath rather than showing through. */
+.feedbar {
+  position: sticky;
+  top: 56px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 0;
+  background: var(--c-canvas);
+}
+
 .footer {
   border-top: 1px solid var(--c-line);
   padding: 18px 0;
   font-size: 12.5px;
   color: var(--c-ink-4);
+}
+
+/* --- Responsive collapse --------------------------------------------------
+   Two breakpoints, and they drop the columns in order of how little they are
+   missed: context first, then navigation — which does not vanish, it becomes
+   a scrollable row of pills under the bar. A nav you cannot reach is worse
+   than a nav that takes a swipe. */
+
+@media (max-width: 1180px) {
+  .layout {
+    grid-template-columns: var(--col-nav) minmax(0, 1fr);
+  }
+  .rail {
+    display: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+  }
+
+  .sidenav {
+    position: static;
+    flex-direction: row;
+    gap: 6px;
+    overflow-x: auto;
+    padding-bottom: 10px;
+    margin-inline: -4px;
+    border-bottom: 1px solid var(--c-line);
+    scrollbar-width: none;
+  }
+  .sidenav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .sidenav-group {
+    flex-direction: row;
+    gap: 6px;
+  }
+
+  /* The group titles and the standing note are the first things to go — they
+     explain a layout that no longer exists at this width. */
+  .sidenav-label,
+  .sidenav-note {
+    display: none;
+  }
+
+  .sidenav a {
+    padding: 7px 13px;
+    border-radius: var(--r-full);
+    border: 1px solid var(--c-line);
+    white-space: nowrap;
+  }
+
+  .sidenav a[aria-current='page'] {
+    border-color: var(--c-brand);
+  }
+
+  .sidenav a[aria-current='page']::before {
+    display: none;
+  }
+
+  /* The topbar grows a second row down here, so a fixed sticky offset would
+     tuck the sort strip underneath it. Not worth measuring the bar at runtime
+     for a control that is two thumb-scrolls from the top anyway. */
+  .feedbar {
+    position: static;
+  }
+}
+
+/* Search moves to its own row rather than disappearing. It is the second most
+   used control in the bar — collapsing it to an icon that opens a field is one
+   more tap for the thing people came to do. */
+@media (max-width: 720px) {
+  .topbar-inner {
+    height: auto;
+    padding-block: 10px;
+    flex-wrap: wrap;
+  }
+
+  .searchbar {
+    order: 3;
+    flex-basis: 100%;
+    max-width: none;
+    margin-inline: 0;
+  }
+
+  .topbar-actions {
+    order: 2;
+  }
 }
 
 /* ==========================================================================
@@ -1492,7 +1982,7 @@ select.input {
 }
 
 .ba-tag-after {
-  background: color-mix(in srgb, #15803d 88%, black);
+  background: color-mix(in srgb, var(--c-tri-3) 82%, black);
 }
 
 .ba-missing {
@@ -1784,7 +2274,7 @@ select.input {
 }
 
 .hc-tag-done {
-  background: color-mix(in srgb, #15803d 88%, black);
+  background: color-mix(in srgb, var(--c-tri-3) 82%, black);
 }
 
 /* Scrim rather than a solid bar — the caption stays readable over the artwork
@@ -2502,14 +2992,50 @@ select.input {
   position: relative;
   transition:
     border-color var(--t-mid) ease,
-    box-shadow var(--t-mid) var(--ease-out),
-    transform var(--t-mid) var(--ease-out);
+    background var(--t-mid) ease;
 }
 
+/* No lift on hover. A card that rises is fine when there are three of them;
+   in a feed of forty, running the pointer down the column makes the whole
+   page pump. Border and ground only. */
 .post:hover {
   border-color: var(--c-line-strong);
-  box-shadow: var(--e-2);
-  transform: translateY(-2px);
+  background: var(--c-surface-2);
+}
+
+/* --- Composer, closed ---
+   One row, the height of the control inside it. It reads as an input because
+   that is what it becomes; it is a button because clicking anywhere along it
+   should open the form, and a real <button> gets that plus keyboard focus for
+   free. */
+
+.composer-shut {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 10px 14px;
+}
+
+.composer-prompt {
+  flex: 1;
+  min-width: 0;
+  height: 38px;
+  padding: 0 16px;
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-full);
+  background: var(--c-surface-2);
+  color: var(--c-ink-3);
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color var(--t-fast) ease,
+    background var(--t-fast) ease;
+}
+
+.composer-prompt:hover {
+  border-color: var(--c-brand);
+  background: var(--c-surface);
 }
 
 /* Ring for a post you have just filed.
@@ -2533,26 +3059,78 @@ select.input {
   padding: 16px 18px;
 }
 
+/* `flex-start`, not the default stretch. A pill-shaped vote control told to
+   fill the rail grows to the height of the post body, and a 200px-tall orange
+   lozenge is not a button. */
 .post-rail {
   display: flex;
   justify-content: center;
+  align-items: flex-start;
 }
 
+/* Attribution sits *above* the headline, not below it. On a feed you decide
+   whether to read a post partly on who raised it and where — putting that at
+   the bottom means deciding after you have already read it. */
 .post-meta {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px 16px;
-  padding-top: 10px;
-  border-top: 1px solid var(--c-line);
-  font-size: 13px;
+  gap: 6px 12px;
+  font-size: 12.5px;
   color: var(--c-ink-3);
 }
 
 .post-meta .avatar {
-  width: 24px;
-  height: 24px;
-  font-size: 10px;
+  width: 22px;
+  height: 22px;
+  font-size: 9.5px;
+}
+
+/* Dot separators, drawn rather than typed, so they never land at the start of
+   a wrapped line. */
+.post-meta .dot::before {
+  content: '·';
+  color: var(--c-ink-4);
+}
+
+/* Action row: ghost pills, quiet until you go near them. */
+.post-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
+
+.post-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 11px;
+  border-radius: var(--r-full);
+  background: transparent;
+  border: 0;
+  color: var(--c-ink-3);
+  font-size: 12.5px;
+  font-weight: 550;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background var(--t-fast) ease,
+    color var(--t-fast) ease;
+}
+
+.post-action:hover {
+  background: var(--c-surface-3);
+  color: var(--c-ink);
+}
+
+.post-action svg {
+  color: var(--c-ink-4);
+}
+
+.post-action:hover svg {
+  color: var(--c-ink-2);
 }
 
 @media (max-width: 560px) {
@@ -2573,10 +3151,10 @@ select.input {
   flex-direction: column;
   align-items: center;
   gap: 1px;
-  width: 46px;
+  width: 44px;
   padding: 7px 0 6px;
   border: 1px solid var(--c-line-strong);
-  border-radius: var(--r-md);
+  border-radius: var(--r-full);
   background: var(--c-surface-2);
   color: var(--c-ink-3);
   font-size: 14px;
@@ -2605,10 +3183,24 @@ select.input {
   cursor: progress;
 }
 
+/* Backed. Filled, not tinted — this is the one piece of state a resident owns
+   on the whole screen, and at a glance down a column of forty you should be
+   able to count the ones you have already pressed without reading anything. */
 .upvote-on {
-  border-color: var(--c-brand);
-  background: var(--c-brand-soft);
-  color: var(--c-brand-ink);
+  border-color: transparent;
+  background: var(--c-brand);
+  color: #fff;
+}
+
+.upvote-on:hover:not(:disabled) {
+  border-color: transparent;
+  background: var(--c-brand-hover);
+  color: #fff;
+}
+
+:root[data-theme='dark'] .upvote-on,
+:root[data-theme='dark'] .upvote-on:hover:not(:disabled) {
+  color: #1a1005;
 }
 
 .upvote-sm {
