@@ -12,6 +12,8 @@ import {
   Users,
 } from 'lucide-react';
 import BeforeAfter from './BeforeAfter';
+import HeroCollage from './HeroCollage';
+import Reveal from './Reveal';
 import { useAuth } from '../lib/authContext';
 import { demoResolved } from '../lib/demoData';
 import { statusOf, upvotesOf } from '../lib/format';
@@ -78,75 +80,79 @@ export default function Landing({ complaints, onReport, onSeeWork }) {
 
       {/* ---- Hero ---- */}
       <section className="hero">
-        <span className="eyebrow">Kolkata Municipal Corporation · pilot</span>
-        <h1>
-          Report it once.
-          <br />
-          <em>Then watch the street back you up.</em>
-        </h1>
-        <p className="hero-lede">
-          Post the pothole, the streetlight that&rsquo;s been dark a fortnight, the bin nobody has
-          emptied. Neighbours who have hit the same thing back it, and the ones with the most
-          backing — weighted by how dangerous they are — go to the top of the corporation&rsquo;s
-          queue.
-        </p>
+        <div className="hero-copy">
+          <span className="eyebrow">Kolkata Municipal Corporation · pilot</span>
+          <h1>
+            Report it once.
+            <br />
+            <em>Then watch the street back you up.</em>
+          </h1>
+          <p className="hero-lede">
+            Post the pothole, the streetlight that&rsquo;s been dark a fortnight, the bin nobody has
+            emptied. Neighbours who have hit the same thing back it, and the ones with the most
+            backing — weighted by how dangerous they are — go to the top of the corporation&rsquo;s
+            queue.
+          </p>
 
-        <div className="hero-actions">
-          {!user && (
-            <>
-              <Link className="btn btn-primary btn-lg" to={withNext('/signup')}>
-                <UserPlus size={17} aria-hidden="true" />
-                Create a resident account
-              </Link>
-              <Link className="btn btn-lg" to={withNext('/login')}>
-                <LogIn size={16} aria-hidden="true" />
-                Sign in
-              </Link>
-            </>
-          )}
+          <div className="hero-actions">
+            {!user && (
+              <>
+                <Link className="btn btn-primary btn-lg" to={withNext('/signup')}>
+                  <UserPlus size={17} aria-hidden="true" />
+                  Create a resident account
+                </Link>
+                <Link className="btn btn-lg" to={withNext('/login')}>
+                  <LogIn size={16} aria-hidden="true" />
+                  Sign in
+                </Link>
+              </>
+            )}
 
-          {user && !isAdmin && (
-            <>
-              <Link className="btn btn-primary btn-lg" to="/community">
-                <Users size={17} aria-hidden="true" />
-                Open the community feed
-              </Link>
-              <button type="button" className="btn btn-lg" onClick={onReport}>
-                <Camera size={16} aria-hidden="true" />
-                File a formal report
-              </button>
-            </>
-          )}
+            {user && !isAdmin && (
+              <>
+                <Link className="btn btn-primary btn-lg" to="/community">
+                  <Users size={17} aria-hidden="true" />
+                  Open the community feed
+                </Link>
+                <button type="button" className="btn btn-lg" onClick={onReport}>
+                  <Camera size={16} aria-hidden="true" />
+                  File a formal report
+                </button>
+              </>
+            )}
 
-          {isAdmin && (
-            <>
-              <Link className="btn btn-primary btn-lg" to="/admin">
-                <LayoutDashboard size={17} aria-hidden="true" />
-                Open the triage queue
-              </Link>
-              <button type="button" className="btn btn-lg" onClick={onSeeWork}>
-                See what&rsquo;s been fixed
-                <ArrowRight size={16} aria-hidden="true" />
-              </button>
-            </>
-          )}
+            {isAdmin && (
+              <>
+                <Link className="btn btn-primary btn-lg" to="/admin">
+                  <LayoutDashboard size={17} aria-hidden="true" />
+                  Open the triage queue
+                </Link>
+                <button type="button" className="btn btn-lg" onClick={onSeeWork}>
+                  See what&rsquo;s been fixed
+                  <ArrowRight size={16} aria-hidden="true" />
+                </button>
+              </>
+            )}
+          </div>
+
+          <div className="tally">
+            <span>
+              <b>{complaints.length}</b> problems raised
+            </span>
+            <span>
+              <b>{backing}</b> times backed by a neighbour
+            </span>
+            <span>
+              <b>{resolvedCount}</b> closed with photo proof
+            </span>
+          </div>
         </div>
 
-        <div className="tally">
-          <span>
-            <b>{complaints.length}</b> problems raised
-          </span>
-          <span>
-            <b>{backing}</b> times backed by a neighbour
-          </span>
-          <span>
-            <b>{resolvedCount}</b> closed with photo proof
-          </span>
-        </div>
+        <HeroCollage />
       </section>
 
       {/* ---- Two portals ---- */}
-      <section className="band">
+      <Reveal as="section" className="band">
         <div className="band-head">
           <span className="eyebrow">Two ways in</span>
           <h2>Residents post and vote. One administrator acts.</h2>
@@ -158,7 +164,7 @@ export default function Landing({ complaints, onReport, onSeeWork }) {
         </div>
 
         <div className="portal-grid">
-          <div className="portal-card">
+          <div className="portal-card reveal-item" style={{ '--i': 0 }}>
             <span className="stat-icon" style={{ '--tone': 'var(--c-brand)', '--tone-soft': 'var(--c-brand-soft)' }}>
               <Users size={17} aria-hidden="true" />
             </span>
@@ -173,7 +179,7 @@ export default function Landing({ complaints, onReport, onSeeWork }) {
             </Link>
           </div>
 
-          <div className="portal-card">
+          <div className="portal-card reveal-item" style={{ '--i': 1 }}>
             <span className="stat-icon" style={{ '--tone': 'var(--c-ok)', '--tone-soft': 'var(--c-ok-soft)' }}>
               <ShieldCheck size={17} aria-hidden="true" />
             </span>
@@ -189,10 +195,10 @@ export default function Landing({ complaints, onReport, onSeeWork }) {
             </Link>
           </div>
         </div>
-      </section>
+      </Reveal>
 
       {/* ---- The one rule ---- */}
-      <section className="band">
+      <Reveal as="section" className="band">
         <div className="band-head">
           <span className="eyebrow">Why the backing count matters</span>
           <h2>A pothole twelve people hit is a different pothole</h2>
@@ -211,10 +217,10 @@ export default function Landing({ complaints, onReport, onSeeWork }) {
             moves a case up, but it never lets a nuisance outrank a hazard.
           </p>
         </div>
-      </section>
+      </Reveal>
 
       {/* ---- Pipeline ---- */}
-      <section className="band">
+      <Reveal as="section" className="band">
         <div className="band-head">
           <span className="eyebrow">After you press post</span>
           <h2>Where your problem goes</h2>
@@ -223,7 +229,10 @@ export default function Landing({ complaints, onReport, onSeeWork }) {
 
         <div className="timeline">
           {PIPELINE.map((s, i) => (
-            <div className="step anim-rise" key={s.n} style={{ '--i': i }}>
+            /* `reveal-item`, not `anim-rise`: the steps should count themselves
+               in when the band scrolls into view, not silently on page load
+               while the reader is still up in the hero. */
+            <div className="step reveal-item" key={s.n} style={{ '--i': i }}>
               <span className="step-mark">{s.n === 2 ? <ChevronUp size={15} /> : s.n}</span>
               <div>
                 <h4>{s.title}</h4>
@@ -232,16 +241,16 @@ export default function Landing({ complaints, onReport, onSeeWork }) {
             </div>
           ))}
         </div>
-      </section>
+      </Reveal>
 
       {/* ---- Worked example ---- */}
-      <section className="band">
+      <Reveal as="section" className="band">
         <div className="band-head">
           <span className="eyebrow">One that closed</span>
           <h2>What a finished case looks like</h2>
         </div>
 
-        <div className="case-study">
+        <div className="case-study reveal-item">
           <div style={{ padding: 14 }}>
             <BeforeAfter item={demoResolved[0]} />
           </div>
@@ -279,10 +288,10 @@ export default function Landing({ complaints, onReport, onSeeWork }) {
             </p>
           </div>
         </div>
-      </section>
+      </Reveal>
 
       {/* ---- Close ---- */}
-      <section className="band">
+      <Reveal as="section" className="band">
         <div className="band-head" style={{ marginBottom: 18 }}>
           <h2>Something broken on your street?</h2>
           <p>
@@ -311,7 +320,7 @@ export default function Landing({ complaints, onReport, onSeeWork }) {
             )}
           </Link>
         )}
-      </section>
+      </Reveal>
     </div>
   );
 }

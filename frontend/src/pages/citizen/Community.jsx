@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { MapPin, MessageSquare, RefreshCw, Users } from 'lucide-react';
 import EmptyState from '../../components/EmptyState';
@@ -8,6 +8,7 @@ import StatusBadge from '../../components/StatusBadge';
 import UpvoteButton from '../../components/UpvoteButton';
 import { useAuth } from '../../lib/authContext';
 import { useComplaints } from '../../lib/complaintsContext';
+import { useFlip } from '../../lib/useFlip';
 import { ago, initials, placeName, severityRank, statusOf, upvotesOf, when } from '../../lib/format';
 
 /**
@@ -35,6 +36,24 @@ export default function Community() {
   const { complaints, loading, refresh, patchOne, addOne } = useComplaints();
   const [sort, setSort] = useState('top');
   const [mineOnly, setMineOnly] = useState(false);
+
+  // The feed slides cards between ranks instead of cutting to the new order —
+  // see useFlip. Attached to the list wrapper below.
+  const feedRef = useFlip();
+
+  // A post you just filed lands at the bottom under "Most backed", because it
+  // has no backing yet. Ringing it for a moment is how you find it there.
+  const [freshId, setFreshId] = useState(null);
+  const freshTimer = useRef(0);
+  useEffect(() => () => clearTimeout(freshTimer.current), []);
+
+  const markFresh = (record) => {
+    addOne(record);
+    if (record?.id == null) return;
+    setFreshId(record.id);
+    clearTimeout(freshTimer.current);
+    freshTimer.current = setTimeout(() => setFreshId(null), 2800);
+  };
 
   const feed = useMemo(() => {
     const list = complaints.filter((c) => !mineOnly || c.author?.id === user?.id);
@@ -69,7 +88,7 @@ export default function Community() {
         </button>
       </div>
 
-      <PostComposer onPosted={addOne} />
+      <PostComposer onPosted={markFresh} />
 
       <div className="card-head" style={{ padding: 0, border: 0 }}>
         <div className="segmented" role="tablist" aria-label="Sort the feed">
@@ -126,9 +145,14 @@ export default function Community() {
         </div>
       )}
 
-      <div className="stack" style={{ '--gap': '12px' }}>
+      <div className="stack" style={{ '--gap': '12px' }} ref={feedRef}>
         {feed.map((c, i) => (
-          <article className="card post anim-rise" key={c.id} style={{ '--i': i }}>
+          <article
+            className={`card post anim-rise${c.id === freshId ? ' post-fresh' : ''}`}
+            key={c.id}
+            data-flip-key={c.id}
+            style={{ '--i': i }}
+          >
             <div className="post-body">
               <div className="post-rail">
                 <UpvoteButton item={c} onChanged={(updated) => patchOne(c.id, updated)} />
