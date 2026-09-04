@@ -320,37 +320,44 @@ function SideRail() {
   const { isAdmin } = useAuth();
 
   const resolved = complaints.filter((c) => statusOf(c) === 'resolved').length;
-  const backing = complaints.reduce((sum, c) => sum + upvotesOf(c), 0);
 
   return (
     <aside className="rail">
-      <div className="rail-card">
-        <div className="rail-card-flag" aria-hidden="true" />
-        <div className="rail-body">
-          <h4>About Spotit</h4>
-          <p>
-            One shared feed for everything the neighbourhood has raised. Spot it, post it, and back
-            what your neighbours have already found — the count is half of what decides the order
-            the corporation works in.
-          </p>
-        </div>
+      <div
+        className="rail-card resolved-counter-card"
+        style={{ textAlign: 'center' }}
+      >
+        <div
+          className="resolved-counter"
+          aria-live="polite"
+          style={{ padding: '28px 20px 24px' }}
+        >
+          <div
+            className="resolved-counter-number"
+            style={{
+              fontFamily: 'var(--f-mono)',
+              fontSize: 'clamp(4rem, 7vw, 6.5rem)',
+              fontWeight: 800,
+              lineHeight: 0.9,
+              letterSpacing: '-0.08em',
+              fontVariantNumeric: 'tabular-nums',
+            }}
+          >
+            {String(resolved).padStart(3, '0')}
+          </div>
 
-        <div className="rail-stats">
-          <div className="rail-stat">
-            <b>{complaints.length}</b>
-            <span>problems raised</span>
-          </div>
-          <div className="rail-stat">
-            <b>{backing}</b>
-            <span>times backed</span>
-          </div>
-          <div className="rail-stat">
-            <b>{resolved}</b>
-            <span>closed with proof</span>
-          </div>
-          <div className="rail-stat">
-            <b>1</b>
-            <span>municipal account</span>
+          <div
+            className="resolved-counter-label"
+            style={{
+              marginTop: '18px',
+              fontFamily: 'var(--f-mono)',
+              fontSize: '0.78rem',
+              fontWeight: 700,
+              letterSpacing: '0.18em',
+              lineHeight: 1.2,
+            }}
+          >
+            RESOLVED CASES
           </div>
         </div>
 
