@@ -35,10 +35,11 @@ import EmptyState from './components/EmptyState';
 import Logo from './components/Logo';
 import PastWork from './components/PastWork';
 import ReportForm from './components/ReportForm';
+import CivicMap from './components/CivicMap';
 import { ToastProvider } from './components/Toast';
 import { useAuth } from './lib/authContext';
 import { useComplaints } from './lib/complaintsContext';
-import { initials, statusOf, upvotesOf } from './lib/format';
+import { initials, statusOf } from './lib/format';
 import { useToast } from './lib/toastContext';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
@@ -320,58 +321,41 @@ function SideRail() {
   const { isAdmin } = useAuth();
 
   const resolved = complaints.filter((c) => statusOf(c) === 'resolved').length;
-  const backing = complaints.reduce((sum, c) => sum + upvotesOf(c), 0);
 
   return (
     <aside className="rail">
-      <div className="rail-card">
-        <div className="rail-card-flag" aria-hidden="true" />
-        <div className="rail-body">
-          <h4>About Spotit</h4>
-          <p>
-            One shared feed for everything the neighbourhood has raised. Spot it, post it, and back
-            what your neighbours have already found — the count is half of what decides the order
-            the corporation works in.
-          </p>
-        </div>
+      <div className="rail-card resolved-counter-card" style={{ textAlign: 'center' }}>
+        <div
+          className="resolved-counter"
+          aria-live="polite"
+          style={{ padding: '14px 16px 10px' }}
+        >
+          <div
+            className="resolved-counter-number"
+            style={{
+              fontSize: 'clamp(2.6rem, 4vw, 4rem)',
+              lineHeight: 0.95,
+            }}
+          >
+            {String(resolved).padStart(3, '0')}
+          </div>
 
-        <div className="rail-stats">
-          <div className="rail-stat">
-            <b>{complaints.length}</b>
-            <span>problems raised</span>
-          </div>
-          <div className="rail-stat">
-            <b>{backing}</b>
-            <span>times backed</span>
-          </div>
-          <div className="rail-stat">
-            <b>{resolved}</b>
-            <span>closed with proof</span>
-          </div>
-          <div className="rail-stat">
-            <b>1</b>
-            <span>municipal account</span>
+          <div
+            className="resolved-counter-label"
+            style={{ marginTop: 8, fontSize: '0.68rem', letterSpacing: '0.14em' }}
+          >
+            RESOLVED CASES
           </div>
         </div>
 
-        <div className="rail-body">
+        <div className="rail-body" style={{ paddingTop: 8, paddingBottom: 14 }}>
           <Link className="btn btn-primary" to={isAdmin ? '/admin' : '/report'}>
             {isAdmin ? 'Open the triage queue' : 'Report an issue'}
           </Link>
         </div>
       </div>
 
-      <div className="rail-card">
-        <div className="rail-body">
-          <h4>How the queue is ordered</h4>
-          <ol className="rail-rules">
-            <li>Severity is classified from the words in the report, not from who filed it.</li>
-            <li>Backing is one press per account. The bonus is capped, so popular never outranks dangerous.</li>
-            <li>Nothing is dispatched before the desk has verified it is real.</li>
-            <li>A case closes with a photo of the finished work, or it does not close.</li>
-          </ol>
-        </div>
-      </div>
+      <CivicMap complaints={complaints} />
     </aside>
   );
 }

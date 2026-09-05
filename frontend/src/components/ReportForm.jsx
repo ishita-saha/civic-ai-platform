@@ -10,7 +10,7 @@ import {
   ShieldCheck,
   Trash2,
 } from 'lucide-react';
-import { createComplaint, readableError } from '../lib/api';
+import { readableError } from '../lib/api';
 import { useAuth } from '../lib/authContext';
 import { CATEGORIES } from '../lib/demoData';
 import { useToast } from '../lib/toastContext';
@@ -49,6 +49,7 @@ export default function ReportForm({ onSubmitted }) {
 
   const [submitting, setSubmitting] = useState(false);
   const [receipt, setReceipt] = useState(null);
+  const [electricityEmergency, setElectricityEmergency] = useState(null);
   const previewRef = useRef('');
 
   /**
@@ -135,6 +136,7 @@ export default function ReportForm({ onSubmitted }) {
     setErrors({});
     setTouched(false);
     setReceipt(null);
+    setElectricityEmergency(null);
   };
 
   const handleSubmit = async (e) => {
@@ -154,26 +156,42 @@ export default function ReportForm({ onSubmitted }) {
 
     setSubmitting(true);
     try {
-      const res = await createComplaint({
-        // Attached when there's a session, so a formal report shows up on the
-        // feed as yours and can be backed by neighbours like any other post.
-        // The form still works signed out — it is the one route that does.
-        author_id: user?.id ?? null,
-        complainant: {
-          fullName: values.fullName.trim(),
-          phone: values.phone.trim(),
-          email: values.email.trim() || null,
-        },
-        title: values.title.trim(),
-        description: values.description.trim(),
-        category: values.category,
-        location: `${coords.lat.toFixed(4)}° N, ${coords.lng.toFixed(4)}° E`,
-        geotag: coords,
-        image_name: file?.name ?? null,
-        timestamp: new Date().toISOString(),
-      });
+      const complaintPayload = {
+  author_id: user?.id ?? null,
+  complainant: {
+    fullName: values.fullName.trim(),
+    phone: values.phone.trim(),
+    email: values.email.trim() || null,
+  },
+  title: values.title.trim(),
+  description: values.description.trim(),
+  category: values.category,
+  location: `${coords.lat.toFixed(4)}° N, ${coords.lng.toFixed(4)}° E`,
+  geotag: coords,
+  timestamp: new Date().toISOString(),
+};
+
+const formData = new FormData();
+
+formData.append('payload', JSON.stringify(complaintPayload));
+formData.append('image', file);
+
+const response = await fetch('http://127.0.0.1:8000/complaints/with-image', {
+  method: 'POST',
+  body: formData,
+});
+
+const res = await response.json();
+
+if (!response.ok) {
+  throw new Error(res?.detail || 'Could not submit the report.');
+}
 
       const id = res?.data?.id ?? res?.id;
+      const emergency = res?.data?.electricity_emergency ?? null;
+      if (emergency?.is_urgent) {
+        setElectricityEmergency(emergency);
+      }
       setReceipt({ id, title: values.title.trim() });
       toast.success('Report filed', id ? `Your reference is #${id}.` : 'Thanks for reporting it.');
       onSubmitted?.();
@@ -186,44 +204,151 @@ export default function ReportForm({ onSubmitted }) {
 
   if (receipt) {
     return (
-      <div className="card page-enter" style={{ maxWidth: 620, margin: '0 auto' }}>
-        <div className="card-body stack" style={{ '--gap': '14px', textAlign: 'center' }}>
-          <div style={{ display: 'grid', placeItems: 'center' }}>
-            <span
-              className="stat-icon"
+      <>
+        {electricityEmergency && (
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="electricity-emergency-title"
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 1000,
+              display: 'grid',
+              placeItems: 'center',
+              padding: 20,
+              background: 'rgba(15, 23, 42, 0.62)',
+            }}
+          >
+            <div
+              className="card page-enter"
               style={{
-                '--tone': 'var(--c-ok)',
-                '--tone-soft': 'var(--c-ok-soft)',
-                width: 48,
-                height: 48,
-                borderRadius: 'var(--r-md)',
-                animation: 'pop var(--t-slow) var(--ease-spring)',
+                width: 'min(100%, 520px)',
+                maxHeight: '90vh',
+                overflowY: 'auto',
+                boxShadow: '0 24px 70px rgba(0,0,0,0.28)',
               }}
             >
-              <CheckCircle2 size={24} aria-hidden="true" />
-            </span>
+              <div className="card-body stack" style={{ '--gap': '18px' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                    padding: '12px 14px',
+                    borderRadius: 'var(--r-md)',
+                    background: 'var(--c-danger-soft, #fff1f2)',
+                  }}
+                >
+                  <AlertCircle size={26} aria-hidden="true" />
+                  <div>
+                    <h2 id="electricity-emergency-title" style={{ margin: 0, fontSize: 20 }}>
+                      Electrical Emergency Detected
+                    </h2>
+                    <p className="hint" style={{ margin: '4px 0 0' }}>
+                      Immediate attention may be required.
+                    </p>
+                  </div>
+                </div>
+
+                <p style={{ margin: 0, lineHeight: 1.6 }}>
+                  Your complaint has been identified as a potentially urgent electricity issue.
+                </p>
+
+                <div className="card" style={{ margin: 0 }}>
+                  <div className="card-body stack" style={{ '--gap': '8px' }}>
+                    <div className="hint">AI-detected issue</div>
+                    <strong>{electricityEmergency.issue_type}</strong>
+                    <p className="hint" style={{ margin: 0 }}>
+                      {electricityEmergency.reason}
+                    </p>
+                    <span className="chip">
+                      Confidence: {Math.round((electricityEmergency.confidence ?? 0) * 100)}%
+                    </span>
+                  </div>
+                </div>
+
+                <div className="stack" style={{ '--gap': '6px' }}>
+                  <h3 style={{ margin: 0, fontSize: 16 }}>Assigned Electrical Engineer</h3>
+                  <div>
+                    <strong>{electricityEmergency.assigned_contact?.name}</strong>
+                  </div>
+                  <div className="hint">
+                    {electricityEmergency.assigned_contact?.designation}
+                    {electricityEmergency.assigned_contact?.zone
+                      ? ` · ${electricityEmergency.assigned_contact.zone}`
+                      : ''}
+                  </div>
+                  <div className="mono tnum">
+                    📞 {electricityEmergency.assigned_contact?.phone}
+                  </div>
+                </div>
+
+                <div className="row" style={{ justifyContent: 'flex-end', gap: 10 }}>
+                  {electricityEmergency.assigned_contact?.phone && (
+                    <a
+                      className="btn btn-primary"
+                      href={`tel:${electricityEmergency.assigned_contact.phone}`}
+                    >
+                      Call Engineer
+                    </a>
+                  )}
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() => setElectricityEmergency(null)}
+                  >
+                    Continue
+                  </button>
+                </div>
+
+                <p className="hint" style={{ margin: 0, textAlign: 'center' }}>
+                  Demo contact shown for hackathon demonstration.
+                </p>
+              </div>
+            </div>
           </div>
+        )}
 
-          <h2 style={{ fontSize: 20 }}>Thanks — that&rsquo;s logged.</h2>
-          <p className="page-lede" style={{ margin: '0 auto' }}>
-            “{receipt.title}” is sitting with the triage desk. Hang on to the reference below —
-            there are no SMS alerts yet, so it&rsquo;s how you find your case on the dashboard.
-          </p>
+        <div className="card page-enter" style={{ maxWidth: 620, margin: '0 auto' }}>
+          <div className="card-body stack" style={{ '--gap': '14px', textAlign: 'center' }}>
+            <div style={{ display: 'grid', placeItems: 'center' }}>
+              <span
+                className="stat-icon"
+                style={{
+                  '--tone': 'var(--c-ok)',
+                  '--tone-soft': 'var(--c-ok-soft)',
+                  width: 48,
+                  height: 48,
+                  borderRadius: 'var(--r-md)',
+                  animation: 'pop var(--t-slow) var(--ease-spring)',
+                }}
+              >
+                <CheckCircle2 size={24} aria-hidden="true" />
+              </span>
+            </div>
 
-          {receipt.id != null && (
-            <p className="hint">
-              Reference <span className="mono chip">#{receipt.id}</span>
+            <h2 style={{ fontSize: 20 }}>Thanks — that&rsquo;s logged.</h2>
+            <p className="page-lede" style={{ margin: '0 auto' }}>
+              “{receipt.title}” is sitting with the triage desk. Hang on to the reference below —
+              there are no SMS alerts yet, so it&rsquo;s how you find your case on the dashboard.
             </p>
-          )}
 
-          <div className="row" style={{ justifyContent: 'center', marginTop: 4 }}>
-            <button type="button" className="btn btn-primary" onClick={reset}>
-              <RotateCcw size={15} aria-hidden="true" />
-              Report something else
-            </button>
+            {receipt.id != null && (
+              <p className="hint">
+                Reference <span className="mono chip">#{receipt.id}</span>
+              </p>
+            )}
+
+            <div className="row" style={{ justifyContent: 'center', marginTop: 4 }}>
+              <button type="button" className="btn btn-primary" onClick={reset}>
+                <RotateCcw size={15} aria-hidden="true" />
+                Report something else
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      </>
     );
   }
 

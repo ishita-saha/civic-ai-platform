@@ -62,7 +62,9 @@ export const CATEGORIES = [
   { value: 'Lighting', label: 'Street lighting' },
   { value: 'Water', label: 'Water supply' },
   { value: 'Drainage', label: 'Drainage & sewage' },
+  { value: 'Electricity', label: 'Electricity' },
   { value: 'Other', label: 'Something else' },
+
 ];
 
 /**

@@ -22,10 +22,28 @@ to be papered over with a hash. Nothing here is a substitute for real auth.
 from datetime import datetime, timedelta, timezone
 from itertools import count
 from typing import Any, Dict, List, Optional
+import io
+import json
+import os
 
-from fastapi import Depends, FastAPI, Header, HTTPException, status
+from dotenv import load_dotenv
+from google import genai
+
+from fastapi import Depends, FastAPI, Header, HTTPException, status, File, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from PIL import Image, ImageStat, ImageFilter
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+
+load_dotenv()
+
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
+if not GEMINI_API_KEY:
+    raise RuntimeError("GEMINI_API_KEY is not configured")
+
+gemini_client = genai.Client(api_key=GEMINI_API_KEY)
 
 app = FastAPI(title="Spotit API", version="0.3.0")
 
@@ -96,6 +114,7 @@ DEPARTMENTS = {
     "Roads": "Public Works Department (PWD)",
     "Sanitation": "Solid Waste Management Dept.",
     "Lighting": "Electrical & Street Lighting Dept.",
+    "Electricity": "Electricity Department",
     "Water": "Water Supply Department",
     "Drainage": "Drainage & Sewerage Dept.",
 }
@@ -110,6 +129,160 @@ def classify_severity(*parts: Optional[str]) -> str:
     if any(w in blob for w in MODERATE_WORDS):
         return "moderate"
     return "low"
+
+    
+    
+    
+    
+def analyze_image_severity(image_bytes: bytes) -> Dict[str, Any]:
+    """
+    Lightweight image-assisted severity analysis.
+
+    This does not replace the existing text-based severity classifier.
+    It extracts visual risk signals from the uploaded image and gives
+    the triage engine an additional, conservative signal.
+    """
+
+    try:
+        image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+
+        # Resize so analysis stays fast even for large phone photos.
+        image.thumbnail((256, 256))
+
+        # Basic brightness and contrast.
+        grayscale = image.convert("L")
+        stats = ImageStat.Stat(grayscale)
+
+        brightness = stats.mean[0]
+        contrast = stats.stddev[0]
+
+        # Edge density gives us a simple measure of visible structure/
+        # damage-like boundaries without requiring a large ML model.
+        edges = grayscale.filter(ImageFilter.FIND_EDGES)
+        edge_stats = ImageStat.Stat(edges)
+        edge_strength = edge_stats.mean[0]
+
+        signals = []
+
+        if brightness < 45:
+            signals.append("very_dark_image")
+
+        if contrast > 70:
+            signals.append("high_contrast")
+
+        if edge_strength > 35:
+            signals.append("strong_visual_edges")
+
+        # Conservative visual score.
+        visual_score = 0
+
+        if brightness < 45:
+            visual_score += 5
+
+        if contrast > 70:
+            visual_score += 5
+
+        if edge_strength > 35:
+            visual_score += 5
+
+        visual_score = min(visual_score, 15)
+
+        if visual_score >= 10:
+            image_severity = "high"
+        elif visual_score >= 5:
+            image_severity = "moderate"
+        else:
+            image_severity = "low"
+
+        return {
+            "available": True,
+            "severity": image_severity,
+            "visual_score": visual_score,
+            "signals": signals,
+            "brightness": round(brightness, 2),
+            "contrast": round(contrast, 2),
+            "edge_strength": round(edge_strength, 2),
+        }
+
+    except Exception as exc:
+        return {
+            "available": False,
+            "severity": "low",
+            "visual_score": 0,
+            "signals": [],
+            "error": str(exc),
+        }
+
+
+
+class ElectricityUrgencyResult(BaseModel):
+    is_electricity_issue: bool
+    is_urgent: bool
+    issue_type: str
+    reason: str
+    confidence: float
+
+
+def analyze_electricity_urgency(title: str, description: str) -> Dict[str, Any]:
+    """
+    Use Gemini to semantically classify an Electricity complaint.
+    This intentionally does not use hardcoded keyword matching.
+    """
+
+    prompt = f"""
+You are an electricity complaint triage assistant for a civic issue reporting platform.
+
+Determine whether this complaint represents an urgent electricity-related
+public safety hazard or significant local service disruption.
+
+Use the meaning and context of the complaint, NOT exact keyword matching.
+
+Examples of situations that may be urgent include:
+- a fallen or live electrical wire
+- a sparking, smoking, or exploding transformer
+- a fallen electrical pole
+- a dangerous damaged electrical box with exposed wiring
+- a significant local power outage
+
+A routine maintenance issue, such as one failed streetlight, is normally not urgent.
+A billing or account issue is not an emergency.
+
+Judge the actual situation described by the citizen. Do not invent facts.
+Return a confidence between 0 and 1.
+
+Complaint title:
+{title}
+
+Complaint description:
+{description}
+"""
+
+    try:
+        response = gemini_client.models.generate_content(
+            model="gemini-3.6-flash",
+            contents=prompt,
+            config={
+                "response_mime_type": "application/json",
+                "response_schema": ElectricityUrgencyResult,
+            },
+        )
+
+        result = ElectricityUrgencyResult.model_validate_json(response.text)
+        return result.model_dump()
+
+    except Exception as exc:
+        print("\n========== ELECTRICITY LLM ERROR ==========")
+        print(f"Error: {exc}")
+        print("Falling back to normal SpotIt workflow.")
+        print("===========================================\n")
+
+        return {
+            "is_electricity_issue": True,
+            "is_urgent": False,
+            "issue_type": "analysis_unavailable",
+            "reason": "Electricity urgency analysis was unavailable. Normal complaint processing will continue.",
+            "confidence": 0.0,
+        }
 
 
 def priority_of(record: Dict[str, Any]) -> float:
@@ -528,6 +701,141 @@ def create_complaint(data: Dict[Any, Any]):
     rescore(record)
     COMPLAINTS.append(record)
     return {"status": "success", "data": record}
+    
+@app.post("/complaints/with-image", status_code=status.HTTP_201_CREATED)
+async def create_complaint_with_image(
+    payload: str = Form(...),
+    image: UploadFile = File(...),
+):
+    """
+    Create a civic complaint together with its uploaded photo.
+
+    Electricity complaints receive an additional Gemini-based urgency
+    assessment. Non-electricity complaints continue through the normal
+    SpotIt workflow.
+    """
+
+    # Validate uploaded image.
+    if not image.content_type or not image.content_type.startswith("image/"):
+        raise HTTPException(
+            status_code=400,
+            detail="Please upload a valid image file.",
+        )
+
+    image_bytes = await image.read()
+
+    if len(image_bytes) > 10 * 1024 * 1024:
+        raise HTTPException(
+            status_code=400,
+            detail="Image must be smaller than 10 MB.",
+        )
+
+    # Convert the JSON string from the frontend into a dictionary.
+    try:
+        data = json.loads(payload)
+    except json.JSONDecodeError:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid complaint data.",
+        )
+
+    # Existing image-assisted severity analysis.
+    image_analysis = analyze_image_severity(image_bytes)
+
+    text_severity = classify_severity(
+        data.get("title"),
+        data.get("description"),
+        data.get("category"),
+    )
+
+    severity_order = {
+        "low": 0,
+        "moderate": 1,
+        "high": 2,
+        "critical": 3,
+    }
+
+    final_severity = text_severity
+
+    if image_analysis.get("available"):
+        image_severity = image_analysis.get("severity", "low")
+
+        text_rank = severity_order.get(text_severity, 0)
+        image_rank = severity_order.get(image_severity, 0)
+
+        if image_rank > text_rank:
+            final_rank = min(text_rank + 1, 3)
+
+            for severity, rank in severity_order.items():
+                if rank == final_rank:
+                    final_severity = severity
+                    break
+
+    # Electricity-specific Gemini triage.
+    electricity_emergency = None
+
+    if data.get("category") == "Electricity":
+        electricity_result = analyze_electricity_urgency(
+            data.get("title", ""),
+            data.get("description", ""),
+        )
+
+        print("\n========== ELECTRICITY LLM TRIAGE ==========")
+        print(f"Title: {data.get('title')}")
+        print(
+            "LLM electricity issue: "
+            f"{electricity_result.get('is_electricity_issue')}"
+        )
+        print(f"LLM urgent: {electricity_result.get('is_urgent')}")
+        print(f"Issue type: {electricity_result.get('issue_type')}")
+        print(f"Confidence: {electricity_result.get('confidence')}")
+        print("=============================================\n")
+
+        # The LLM decides urgency. We only use confidence as a safety
+        # threshold before triggering the emergency-contact experience.
+        if (
+            electricity_result.get("is_electricity_issue")
+            and electricity_result.get("is_urgent")
+            and electricity_result.get("confidence", 0) >= 0.70
+        ):
+            electricity_emergency = {
+                "is_urgent": True,
+                "issue_type": electricity_result.get("issue_type"),
+                "reason": electricity_result.get("reason"),
+                "confidence": electricity_result.get("confidence"),
+                "assigned_contact": {
+                    "name": "Demo Electrical Engineer",
+                    "designation": "Electrical Maintenance Engineer",
+                    "zone": "Zone 3",
+                    "phone": "1800-000-0000",
+                },
+            }
+
+    # Preserve the existing SpotIt complaint workflow.
+    data["image_name"] = image.filename
+    data["image_analysis"] = image_analysis
+    data["text_severity"] = text_severity
+    data["severity"] = final_severity
+
+    result = create_complaint(data)
+
+    # create_complaint recalculates severity from text, so restore the
+    # final image-assisted severity afterwards.
+    record = result["data"]
+    record["text_severity"] = text_severity
+    record["image_analysis"] = image_analysis
+    record["severity"] = final_severity
+
+    # Only urgent Electricity complaints receive emergency-contact data.
+    if electricity_emergency:
+        record["electricity_emergency"] = electricity_emergency
+
+    rescore(record)
+
+    return {
+        "status": "success",
+        "data": record,
+    }
 
 
 @app.post("/complaints/{complaint_id}/upvote")

@@ -375,6 +375,114 @@ export default function ComplaintDetails() {
 
         <div className="stack" style={{ '--gap': '16px' }}>
           <StatusControls complaint={complaint} onApplied={applyUpdate} />
+          {/* Image-assisted severity analysis */}
+{complaint.image_analysis && (
+  <div className="card">
+    <div className="card-head">
+      <h3>AI-Assisted Severity Analysis</h3>
+      <span className="chip">Image + Text</span>
+    </div>
+
+    <div className="card-body stack" style={{ '--gap': '14px' }}>
+
+      <div
+        style={{
+          padding: '12px',
+          borderRadius: 10,
+          background: 'var(--c-surface-2)',
+          border: '1px solid var(--c-border)',
+        }}
+      >
+        <div
+          className="row"
+          style={{
+            '--gap': '10px',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+          }}
+        >
+          <div>
+            <div className="hint" style={{ fontSize: 12 }}>
+              Final severity
+            </div>
+
+            <div style={{ marginTop: 4 }}>
+              <SeverityBadge item={complaint} />
+            </div>
+          </div>
+
+          <div>
+            <div className="hint" style={{ fontSize: 12 }}>
+              Visual score
+            </div>
+
+            <strong className="tnum">
+              {complaint.image_analysis.visual_score ?? 0} / 15
+            </strong>
+          </div>
+        </div>
+      </div>
+
+      <dl className="kv">
+        <dt>Text severity</dt>
+        <dd>
+          <span style={{ textTransform: 'capitalize' }}>
+            {complaint.text_severity || 'Not available'}
+          </span>
+        </dd>
+
+        <dt>Image severity</dt>
+        <dd>
+          <span style={{ textTransform: 'capitalize' }}>
+            {complaint.image_analysis.severity || 'Not available'}
+          </span>
+        </dd>
+
+        <dt>Visual signals</dt>
+        <dd>
+          {complaint.image_analysis.signals?.length ? (
+            <div className="stack" style={{ '--gap': '5px' }}>
+              {complaint.image_analysis.signals.map((signal) => (
+                <span key={signal} className="chip">
+                  {signal.replaceAll('_', ' ')}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <span className="hint">No significant visual signals detected</span>
+          )}
+        </dd>
+      </dl>
+
+      {complaint.image_analysis.available ? (
+        <p
+          className="row"
+          style={{
+            '--gap': '7px',
+            fontSize: 12.5,
+            color: 'var(--c-ok)',
+          }}
+        >
+          <ShieldCheck size={14} aria-hidden="true" />
+          Image successfully analyzed and included in severity triage.
+        </p>
+      ) : (
+        <p
+          className="row"
+          style={{
+            '--gap': '7px',
+            fontSize: 12.5,
+            color: 'var(--c-warn)',
+          }}
+        >
+          <AlertTriangle size={14} aria-hidden="true" />
+          Image analysis was unavailable. Text severity was used.
+        </p>
+      )}
+
+    </div>
+  </div>
+)}
 
           <div className="card">
             <div className="card-head">
