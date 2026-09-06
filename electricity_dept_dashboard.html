@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Electricity Department - Shift Dashboard</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: #eef1f5;
+    font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    color: #1f2937;
+    padding: 40px 20px;
+  }
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+    background: #ffffff;
+    border-radius: 10px;
+    padding: 40px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+  h1 {
+    margin: 0 0 24px 0;
+    font-size: 28px;
+    color: #1e293b;
+  }
+  .status-card {
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 24px 28px;
+    margin-bottom: 36px;
+    background: #fafbfc;
+  }
+  .status-card h2 {
+    margin: 0 0 18px 0;
+    font-size: 18px;
+    color: #111827;
+  }
+  .status-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 32px;
+  }
+  .status-item {
+    min-width: 180px;
+  }
+  .status-item .label {
+    font-weight: 700;
+    font-size: 14px;
+    color: #111827;
+  }
+  .status-item .value {
+    font-size: 15px;
+    margin-top: 4px;
+  }
+  .badge {
+    display: inline-block;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 4px;
+    font-size: 13px;
+  }
+  .badge.active {
+    color: #15803d;
+    background: #dcfce7;
+  }
+  .badge.emergency {
+    color: #b91c1c;
+    background: #fee2e2;
+  }
+  h2.section-title {
+    font-size: 20px;
+    margin: 0 0 16px 0;
+    color: #111827;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+  }
+  thead tr {
+    background: #f1f5f9;
+    text-align: left;
+  }
+  th, td {
+    padding: 14px 16px;
+    border-bottom: 1px solid #e5e7eb;
+  }
+  th {
+    color: #475569;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  tr:last-child td {
+    border-bottom: none;
+  }
+  .status-available {
+    color: #15803d;
+    font-weight: 700;
+  }
+  .status-oncall {
+    color: #b45309;
+    font-weight: 700;
+  }
+  .status-busy {
+    color: #b91c1c;
+    font-weight: 700;
+  }
+  .status-offduty {
+    color: #6b7280;
+    font-weight: 700;
+  }
+  .contact {
+    font-family: "Courier New", monospace;
+    font-size: 13.5px;
+  }
+  .footer-note {
+    margin-top: 20px;
+    font-size: 12.5px;
+    color: #94a3b8;
+  }
+  .refresh-time {
+    font-size: 13px;
+    color: #64748b;
+    margin-bottom: 28px;
+  }
+</style>
+</head>
+<body>
+  <div class="container">
+    <h1>⚡ Electricity Department — Shift Control Dashboard</h1>
+    <div class="refresh-time">Last updated: <span id="now"></span></div>
+
+    <div class="status-card">
+      <h2>Current Shift Status</h2>
+      <div class="status-row">
+        <div class="status-item">
+          <div class="label">Shift</div>
+          <div class="value">B Shift (14:00 – 22:00)</div>
+        </div>
+        <div class="status-item">
+          <div class="label">Substation / Division</div>
+          <div class="value">Ashta Division, MP Electricity Board</div>
+        </div>
+        <div class="status-item">
+          <div class="label">Shift In-Charge</div>
+          <div class="value">R. K. Sharma (JE)</div>
+        </div>
+        <div class="status-item">
+          <div class="label">Emergency Hotline</div>
+          <div class="value contact">1912 / +91-98XXXXXX10</div>
+        </div>
+        <div class="status-item">
+          <div class="label">Status</div>
+          <div class="value"><span class="badge active">All Systems Normal</span></div>
+        </div>
+      </div>
+    </div>
+
+    <h2 class="section-title">On-Duty Staff — Available for Emergency</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Name</th>
+          <th>Designation</th>
+          <th>Contact No.</th>
+          <th>Zone / Feeder</th>
+          <th>Status</th>
+          <th>Since</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>1</td>
+          <td>R. K. Sharma</td>
+          <td>Junior Engineer (Shift In-Charge)</td>
+          <td class="contact">98XXXXXX10</td>
+          <td>Control Room</td>
+          <td class="status-available">Available</td>
+          <td>14:00</td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td>Mahesh Patel</td>
+          <td>Lineman</td>
+          <td class="contact">98XXXXXX22</td>
+          <td>Feeder 3 – Industrial Area</td>
+          <td class="status-oncall">On Call (Field)</td>
+          <td>14:00</td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td>Suresh Yadav</td>
+          <td>Lineman</td>
+          <td class="contact">98XXXXXX35</td>
+          <td>Feeder 1 – Residential</td>
+          <td class="status-available">Available</td>
+          <td>14:00</td>
+        </tr>
+        <tr>
+          <td>4</td>
+          <td>Anita Verma</td>
+          <td>Electrician</td>
+          <td class="contact">98XXXXXX47</td>
+          <td>Substation 2</td>
+          <td class="status-busy">On Repair Job</td>
+          <td>15:10</td>
+        </tr>
+        <tr>
+          <td>5</td>
+          <td>Deepak Chouhan</td>
+          <td>Helper</td>
+          <td class="contact">98XXXXXX58</td>
+          <td>Control Room</td>
+          <td class="status-available">Available</td>
+          <td>14:00</td>
+        </tr>
+        <tr>
+          <td>6</td>
+          <td>Vikram Singh</td>
+          <td>Senior Lineman</td>
+          <td class="contact">98XXXXXX61</td>
+          <td>Feeder 2 – Rural</td>
+          <td class="status-oncall">On Call (Standby)</td>
+          <td>14:00</td>
+        </tr>
+        <tr>
+          <td>7</td>
+          <td>Prakash Meena</td>
+          <td>Lineman</td>
+          <td class="contact">98XXXXXX73</td>
+          <td>Feeder 4 – Market Area</td>
+          <td class="status-offduty">Off Duty (Next Shift)</td>
+          <td>22:00</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="footer-note">
+      This is a sample static dashboard layout. To make it live, connect the table to your staff/attendance database
+      and refresh status (Available / On Call / Busy / Off Duty) in real time.
+    </div>
+  </div>
+
+<script>
+  document.getElementById('now').textContent = new Date().toLocaleString();
+</script>
+</body>
+</html>
