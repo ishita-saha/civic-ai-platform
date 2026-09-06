@@ -25,18 +25,22 @@ from typing import Any, Dict, List, Optional
 import io
 import json
 import os
+import uuid
 
 from dotenv import load_dotenv
 from google import genai
+from supabase import Client, create_client
 
 from fastapi import Depends, FastAPI, Header, HTTPException, status, File, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from PIL import Image, ImageStat, ImageFilter
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
 
 load_dotenv()
+
+# ==========================================================================
+# Gemini configuration
+# ==========================================================================
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
@@ -44,6 +48,42 @@ if not GEMINI_API_KEY:
     raise RuntimeError("GEMINI_API_KEY is not configured")
 
 gemini_client = genai.Client(api_key=GEMINI_API_KEY)
+
+# ==========================================================================
+# Supabase Storage configuration
+#
+# The service/secret key is backend-only. Never expose it to React or commit
+# it to GitHub. If these variables are missing, the app still runs and the
+# complaint remains in the in-memory MVP, but the image is not persisted.
+# ==========================================================================
+
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_SERVICE_KEY = (
+    os.getenv("SUPABASE_SERVICE_KEY")
+    or os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+    or os.getenv("SUPABASE_SECRET_KEY")
+)
+SUPABASE_STORAGE_BUCKET = os.getenv(
+    "SUPABASE_STORAGE_BUCKET",
+    "complaint-images",
+)
+
+supabase: Optional[Client] = None
+
+if SUPABASE_URL and SUPABASE_SERVICE_KEY:
+    try:
+        supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+        print(
+            f"Supabase Storage enabled · bucket: {SUPABASE_STORAGE_BUCKET}"
+        )
+    except Exception as exc:
+        print(f"Supabase initialization failed: {exc}")
+        supabase = None
+else:
+    print(
+        "Supabase Storage not configured. "
+        "Set SUPABASE_URL and SUPABASE_SERVICE_KEY in backend/.env."
+    )
 
 app = FastAPI(title="Spotit API", version="0.3.0")
 
@@ -114,9 +154,9 @@ DEPARTMENTS = {
     "Roads": "Public Works Department (PWD)",
     "Sanitation": "Solid Waste Management Dept.",
     "Lighting": "Electrical & Street Lighting Dept.",
-    "Electricity": "Electricity Department",
     "Water": "Water Supply Department",
     "Drainage": "Drainage & Sewerage Dept.",
+    "Electricity": "Electricity Department",
 }
 
 
@@ -211,77 +251,6 @@ def analyze_image_severity(image_bytes: bytes) -> Dict[str, Any]:
             "visual_score": 0,
             "signals": [],
             "error": str(exc),
-        }
-
-
-
-class ElectricityUrgencyResult(BaseModel):
-    is_electricity_issue: bool
-    is_urgent: bool
-    issue_type: str
-    reason: str
-    confidence: float
-
-
-def analyze_electricity_urgency(title: str, description: str) -> Dict[str, Any]:
-    """
-    Use Gemini to semantically classify an Electricity complaint.
-    This intentionally does not use hardcoded keyword matching.
-    """
-
-    prompt = f"""
-You are an electricity complaint triage assistant for a civic issue reporting platform.
-
-Determine whether this complaint represents an urgent electricity-related
-public safety hazard or significant local service disruption.
-
-Use the meaning and context of the complaint, NOT exact keyword matching.
-
-Examples of situations that may be urgent include:
-- a fallen or live electrical wire
-- a sparking, smoking, or exploding transformer
-- a fallen electrical pole
-- a dangerous damaged electrical box with exposed wiring
-- a significant local power outage
-
-A routine maintenance issue, such as one failed streetlight, is normally not urgent.
-A billing or account issue is not an emergency.
-
-Judge the actual situation described by the citizen. Do not invent facts.
-Return a confidence between 0 and 1.
-
-Complaint title:
-{title}
-
-Complaint description:
-{description}
-"""
-
-    try:
-        response = gemini_client.models.generate_content(
-            model="gemini-3.6-flash",
-            contents=prompt,
-            config={
-                "response_mime_type": "application/json",
-                "response_schema": ElectricityUrgencyResult,
-            },
-        )
-
-        result = ElectricityUrgencyResult.model_validate_json(response.text)
-        return result.model_dump()
-
-    except Exception as exc:
-        print("\n========== ELECTRICITY LLM ERROR ==========")
-        print(f"Error: {exc}")
-        print("Falling back to normal SpotIt workflow.")
-        print("===========================================\n")
-
-        return {
-            "is_electricity_issue": True,
-            "is_urgent": False,
-            "issue_type": "analysis_unavailable",
-            "reason": "Electricity urgency analysis was unavailable. Normal complaint processing will continue.",
-            "confidence": 0.0,
         }
 
 
@@ -437,6 +406,8 @@ def make_post(
         "created_at": hours_ago(filed_hours_ago),
         "history": [{"status": "Pending", "note": "Filed from the community feed.",
                      "at": hours_ago(filed_hours_ago)}],
+        "image_url": None,
+        "image_storage_path": None,
     }
     record.update(extra)
     return rescore(record)
@@ -544,6 +515,75 @@ def find_complaint(complaint_id: int) -> Dict[str, Any]:
 
 
 # ==========================================================================
+# ==========================================================================
+# Supabase image storage
+# ==========================================================================
+
+def upload_complaint_image(
+    image_bytes: bytes,
+    content_type: str,
+    complaint_id: int,
+) -> Dict[str, Any]:
+    """
+    Store a complaint evidence image in Supabase Storage and return its URL.
+
+    The bucket must already exist. For this hackathon MVP, the bucket should
+    be public so the frontend can display the returned URL directly.
+    """
+
+    if supabase is None:
+        return {
+            "stored": False,
+            "url": None,
+            "path": None,
+            "error": "Supabase Storage is not configured.",
+        }
+
+    extension_by_type = {
+        "image/jpeg": "jpg",
+        "image/png": "png",
+        "image/webp": "webp",
+        "image/gif": "gif",
+    }
+    extension = extension_by_type.get(content_type.lower(), "jpg")
+
+    storage_path = (
+        f"complaints/{complaint_id}/"
+        f"{uuid.uuid4().hex}.{extension}"
+    )
+
+    try:
+        supabase.storage.from_(SUPABASE_STORAGE_BUCKET).upload(
+            path=storage_path,
+            file=image_bytes,
+            file_options={
+                "content-type": content_type,
+                "cache-control": "3600",
+                "upsert": "false",
+            },
+        )
+
+        public_url = supabase.storage.from_(
+            SUPABASE_STORAGE_BUCKET
+        ).get_public_url(storage_path)
+
+        return {
+            "stored": True,
+            "url": public_url,
+            "path": storage_path,
+            "error": None,
+        }
+
+    except Exception as exc:
+        print(f"Supabase image upload failed: {exc}")
+        return {
+            "stored": False,
+            "url": None,
+            "path": storage_path,
+            "error": str(exc),
+        }
+
+
 # Request bodies
 # ==========================================================================
 
@@ -571,6 +611,14 @@ class StatusBody(BaseModel):
 class VerifyBody(BaseModel):
     note: Optional[str] = None
     verified_by: Optional[str] = None
+
+
+class ElectricityUrgencyResult(BaseModel):
+    is_electricity_issue: bool
+    is_urgent: bool
+    issue_type: str
+    reason: str
+    confidence: float
 
 
 # ==========================================================================
@@ -651,6 +699,78 @@ def get_complaint(complaint_id: int):
     return find_complaint(complaint_id)
 
 
+def analyze_electricity_urgency(title: str, description: str) -> Dict[str, Any]:
+    """
+    Use Gemini to determine whether an Electricity complaint needs
+    immediate attention. This is semantic classification, not keyword matching.
+    """
+    prompt = f"""
+You are an electricity complaint triage assistant for a civic issue reporting platform.
+
+Analyze the complaint and determine whether it represents an urgent
+electricity-related public safety hazard or significant service disruption.
+
+Urgent examples include:
+- fallen or live electrical wires
+- sparking or exploding transformers
+- fallen electrical poles
+- dangerous damaged electrical boxes
+- significant/local power outages
+
+Use the meaning and context of the complaint, not exact keyword matching.
+Do not invent facts.
+
+Complaint title:
+{title}
+
+Complaint description:
+{description}
+"""
+
+    try:
+        response = gemini_client.models.generate_content(
+            model="gemini-3.6-flash",
+            contents=prompt,
+            config={
+                "response_mime_type": "application/json",
+                "response_schema": ElectricityUrgencyResult,
+            },
+        )
+
+        result = ElectricityUrgencyResult.model_validate_json(response.text)
+        result_data = result.model_dump()
+
+        # Keep the model responsible for the classification while applying
+        # a conservative confidence gate before triggering the emergency flow.
+        result_data["is_urgent"] = bool(
+            result.is_electricity_issue
+            and result.is_urgent
+            and result.confidence >= 0.70
+        )
+
+        return result_data
+
+    except Exception as exc:
+        print(f"Gemini electricity analysis failed: {exc}")
+        return {
+            "is_electricity_issue": True,
+            "is_urgent": False,
+            "issue_type": "analysis_unavailable",
+            "reason": "Electricity urgency analysis was unavailable. Normal complaint processing will continue.",
+            "confidence": 0.0,
+            "error": str(exc),
+        }
+
+
+ELECTRICITY_EMERGENCY_CONTACT = {
+    "name": "Rajesh Kumar",
+    "designation": "Electrical Maintenance Engineer",
+    "zone": "Zone 3",
+    "phone": "1800-000-0000",
+    "demo_contact": True,
+}
+
+
 @app.post("/complaints", status_code=status.HTTP_201_CREATED)
 def create_complaint(data: Dict[Any, Any]):
     """
@@ -665,6 +785,21 @@ def create_complaint(data: Dict[Any, Any]):
     description = (data.get("description") or "").strip()
     category = data.get("category") or "Other"
     geotag = data.get("geotag")
+
+    electricity_analysis = None
+    electricity_emergency = None
+
+    if category == "Electricity":
+        electricity_analysis = analyze_electricity_urgency(title, description)
+
+        if electricity_analysis.get("is_urgent"):
+            electricity_emergency = {
+                "urgent": True,
+                "contact": ELECTRICITY_EMERGENCY_CONTACT,
+                "issue_type": electricity_analysis.get("issue_type"),
+                "reason": electricity_analysis.get("reason"),
+                "confidence": electricity_analysis.get("confidence"),
+            }
 
     record: Dict[str, Any] = {
         "id": next(_complaint_ids),
@@ -692,7 +827,15 @@ def create_complaint(data: Dict[Any, Any]):
         "timestamp": data.get("timestamp") or iso(now()),
         "created_at": iso(now()),
         "history": [{"status": "Pending", "note": "Report filed.", "at": iso(now())}],
+        "image_url": data.get("image_url"),
+        "image_storage_path": data.get("image_storage_path"),
     }
+
+    if electricity_analysis is not None:
+        record["electricity_analysis"] = electricity_analysis
+
+    if electricity_emergency is not None:
+        record["electricity_emergency"] = electricity_emergency
 
     for key, value in data.items():
         if key not in record and key != "author_id":
@@ -710,18 +853,18 @@ async def create_complaint_with_image(
     """
     Create a civic complaint together with its uploaded photo.
 
-    Electricity complaints receive an additional Gemini-based urgency
-    assessment. Non-electricity complaints continue through the normal
-    SpotIt workflow.
+    The existing /complaints endpoint remains untouched.
+    This endpoint adds image-assisted severity for the new reporting flow.
     """
 
-    # Validate uploaded image.
+    # Validate that the uploaded file is actually an image.
     if not image.content_type or not image.content_type.startswith("image/"):
         raise HTTPException(
             status_code=400,
             detail="Please upload a valid image file.",
         )
 
+    # Keep the upload small enough for a live demo.
     image_bytes = await image.read()
 
     if len(image_bytes) > 10 * 1024 * 1024:
@@ -730,7 +873,7 @@ async def create_complaint_with_image(
             detail="Image must be smaller than 10 MB.",
         )
 
-    # Convert the JSON string from the frontend into a dictionary.
+    # Convert the JSON string from the frontend back into a dictionary.
     try:
         data = json.loads(payload)
     except json.JSONDecodeError:
@@ -739,9 +882,10 @@ async def create_complaint_with_image(
             detail="Invalid complaint data.",
         )
 
-    # Existing image-assisted severity analysis.
+    # Analyze the actual uploaded image.
     image_analysis = analyze_image_severity(image_bytes)
 
+    # Keep the existing text-based classifier as the primary signal.
     text_severity = classify_severity(
         data.get("title"),
         data.get("description"),
@@ -755,6 +899,8 @@ async def create_complaint_with_image(
         "critical": 3,
     }
 
+    # Conservative image-assisted adjustment:
+    # the image can increase severity, but only by ONE level.
     final_severity = text_severity
 
     if image_analysis.get("available"):
@@ -771,72 +917,72 @@ async def create_complaint_with_image(
                     final_severity = severity
                     break
 
-    # Electricity-specific Gemini triage.
-    electricity_emergency = None
+    # Show the image-assisted triage decision in the backend terminal.
+    print("\n========== IMAGE-ASSISTED TRIAGE ==========")
+    print(f"Image: {image.filename}")
+    print(f"Text severity: {text_severity}")
+    print(f"Image severity: {image_analysis.get('severity')}")
+    print(f"Visual score: {image_analysis.get('visual_score')}")
+    print(f"Signals: {image_analysis.get('signals')}")
+    print(f"FINAL SEVERITY: {final_severity}")
+    print("===========================================\n")
 
-    if data.get("category") == "Electricity":
-        electricity_result = analyze_electricity_urgency(
-            data.get("title", ""),
-            data.get("description", ""),
-        )
-
-        print("\n========== ELECTRICITY LLM TRIAGE ==========")
-        print(f"Title: {data.get('title')}")
-        print(
-            "LLM electricity issue: "
-            f"{electricity_result.get('is_electricity_issue')}"
-        )
-        print(f"LLM urgent: {electricity_result.get('is_urgent')}")
-        print(f"Issue type: {electricity_result.get('issue_type')}")
-        print(f"Confidence: {electricity_result.get('confidence')}")
-        print("=============================================\n")
-
-        # The LLM decides urgency. We only use confidence as a safety
-        # threshold before triggering the emergency-contact experience.
-        if (
-            electricity_result.get("is_electricity_issue")
-            and electricity_result.get("is_urgent")
-            and electricity_result.get("confidence", 0) >= 0.70
-        ):
-            electricity_emergency = {
-                "is_urgent": True,
-                "issue_type": electricity_result.get("issue_type"),
-                "reason": electricity_result.get("reason"),
-                "confidence": electricity_result.get("confidence"),
-                "assigned_contact": {
-                    "name": "Demo Electrical Engineer",
-                    "designation": "Electrical Maintenance Engineer",
-                    "zone": "Zone 3",
-                    "phone": "1800-000-0000",
-                },
-            }
-
-    # Preserve the existing SpotIt complaint workflow.
+    # Add image information to the complaint payload.
     data["image_name"] = image.filename
     data["image_analysis"] = image_analysis
     data["text_severity"] = text_severity
     data["severity"] = final_severity
 
+    # Reuse the existing complaint creation logic.
     result = create_complaint(data)
 
-    # create_complaint recalculates severity from text, so restore the
+    # create_complaint recalculates severity from text, so restore our
     # final image-assisted severity afterwards.
     record = result["data"]
     record["text_severity"] = text_severity
     record["image_analysis"] = image_analysis
     record["severity"] = final_severity
 
-    # Only urgent Electricity complaints receive emergency-contact data.
-    if electricity_emergency:
-        record["electricity_emergency"] = electricity_emergency
+    # ------------------------------------------------------------------
+    # Permanent evidence storage
+    # ------------------------------------------------------------------
+    storage_result = upload_complaint_image(
+        image_bytes=image_bytes,
+        content_type=image.content_type,
+        complaint_id=record["id"],
+    )
 
+    record["image_url"] = storage_result["url"]
+    record["image_storage_path"] = storage_result["path"]
+    record["image_storage_status"] = (
+        "stored" if storage_result["stored"] else "not_stored"
+    )
+
+    if storage_result["error"]:
+        record["image_storage_error"] = storage_result["error"]
+    else:
+        record.pop("image_storage_error", None)
+
+    # Recalculate the priority score using the final severity.
     rescore(record)
+
+    if record.get("electricity_analysis"):
+        print("\n========== GEMINI ELECTRICITY TRIAGE ==========")
+        print(f"Issue type: {record['electricity_analysis'].get('issue_type')}")
+        print(f"Urgent: {record['electricity_analysis'].get('is_urgent')}")
+        print(f"Confidence: {record['electricity_analysis'].get('confidence')}")
+        print(f"Reason: {record['electricity_analysis'].get('reason')}")
+        print("===============================================\n")
 
     return {
         "status": "success",
         "data": record,
+        "image": {
+            "stored": storage_result["stored"],
+            "url": storage_result["url"],
+            "path": storage_result["path"],
+        },
     }
-
 
 @app.post("/complaints/{complaint_id}/upvote")
 def upvote(complaint_id: int, body: VoteBody):

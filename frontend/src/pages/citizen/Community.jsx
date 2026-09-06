@@ -66,11 +66,13 @@ export default function Community() {
   // has no backing yet. Ringing it for a moment is how you find it there.
   const [freshId, setFreshId] = useState(null);
   const freshTimer = useRef(0);
+
   useEffect(() => () => clearTimeout(freshTimer.current), []);
 
   const markFresh = (record) => {
     addOne(record);
     if (record?.id == null) return;
+
     setFreshId(record.id);
     clearTimeout(freshTimer.current);
     freshTimer.current = setTimeout(() => setFreshId(null), 2800);
@@ -82,6 +84,7 @@ export default function Community() {
     );
 
     const ranked = [...list];
+
     if (sort === 'top') {
       ranked.sort((a, b) => upvotesOf(b) - upvotesOf(a) || filedAt(b) - filedAt(a));
     } else if (sort === 'severe') {
@@ -89,6 +92,7 @@ export default function Community() {
     } else {
       ranked.sort((a, b) => filedAt(b) - filedAt(a));
     }
+
     return ranked;
   }, [complaints, mineOnly, query, sort, user?.id]);
 
@@ -121,6 +125,7 @@ export default function Community() {
           <span className="hint tab-label">
             {mine} posted · {backedByMe} backed by you
           </span>
+
           <button
             type="button"
             className={`btn${mineOnly ? ' btn-primary' : ''}`}
@@ -130,6 +135,7 @@ export default function Community() {
             <Users size={15} aria-hidden="true" />
             {mineOnly ? 'Showing yours' : 'Only mine'}
           </button>
+
           <button
             type="button"
             className="btn btn-ghost btn-icon"
@@ -138,7 +144,11 @@ export default function Community() {
             aria-label="Refresh the feed"
             title="Refresh the feed"
           >
-            <RefreshCw size={15} className={loading ? 'spin' : undefined} aria-hidden="true" />
+            <RefreshCw
+              size={15}
+              className={loading ? 'spin' : undefined}
+              aria-hidden="true"
+            />
           </button>
         </div>
       </div>
@@ -151,6 +161,7 @@ export default function Community() {
           <span className="hint">
             {feed.length} {feed.length === 1 ? 'report' : 'reports'} matching
           </span>
+
           <button
             type="button"
             className="btn"
@@ -209,7 +220,10 @@ export default function Community() {
           >
             <div className="post-body">
               <div className="post-rail">
-                <UpvoteButton item={c} onChanged={(updated) => patchOne(c.id, updated)} />
+                <UpvoteButton
+                  item={c}
+                  onChanged={(updated) => patchOne(c.id, updated)}
+                />
               </div>
 
               <div className="stack" style={{ '--gap': '9px', minWidth: 0 }}>
@@ -221,28 +235,71 @@ export default function Community() {
                     <span className="avatar" aria-hidden="true">
                       {initials(c.author?.name || c.complainant?.fullName)}
                     </span>
+
                     <span style={{ color: 'var(--c-ink-2)', fontWeight: 550 }}>
                       {c.author?.name || c.complainant?.fullName || 'Anonymous'}
                     </span>
+
                     {c.author?.id === user?.id && <span className="chip">You</span>}
                   </span>
 
                   <span className="row" style={{ '--gap': '6px' }}>
-                    <MapPin size={13} aria-hidden="true" style={{ color: 'var(--c-ink-4)' }} />
+                    <MapPin
+                      size={13}
+                      aria-hidden="true"
+                      style={{ color: 'var(--c-ink-4)' }}
+                    />
                     {placeName(c)}
                   </span>
 
                   <span className="dot" aria-hidden="true" />
 
-                  <span className="tnum" title={when(c.timestamp || c.created_at)}>
-                    {ago(c.timestamp || c.created_at) || when(c.timestamp || c.created_at)}
+                  <span
+                    className="tnum"
+                    title={when(c.timestamp || c.created_at)}
+                  >
+                    {ago(c.timestamp || c.created_at) ||
+                      when(c.timestamp || c.created_at)}
                   </span>
                 </div>
 
-                <h3 style={{ fontSize: 16.5 }}>{c.title || 'Untitled report'}</h3>
+                <h3 style={{ fontSize: 16.5 }}>
+                  {c.title || 'Untitled report'}
+                </h3>
+
+                {/* Persistent evidence photo.
+                    New complaints uploaded through the image endpoint contain
+                    image_url from Supabase Storage. Older complaints without
+                    an image_url simply continue without showing anything. */}
+                {c.image_url && (
+                  <div
+                    style={{
+                      marginTop: 4,
+                      borderRadius: 12,
+                      overflow: 'hidden',
+                      border: '1px solid var(--c-border)',
+                      background: 'var(--c-surface-2)',
+                    }}
+                  >
+                    <img
+                      src={c.image_url}
+                      alt={`Evidence for ${c.title || 'civic issue'}`}
+                      style={{
+                        display: 'block',
+                        width: '100%',
+                        maxHeight: 360,
+                        objectFit: 'cover',
+                      }}
+                      loading="lazy"
+                    />
+                  </div>
+                )}
 
                 {c.description && (
-                  <p className="hint" style={{ lineHeight: 1.6, fontSize: 13.5 }}>
+                  <p
+                    className="hint"
+                    style={{ lineHeight: 1.6, fontSize: 13.5 }}
+                  >
                     {c.description}
                   </p>
                 )}
@@ -250,21 +307,36 @@ export default function Community() {
                 {/* Classification below the text it was derived from, not
                     above it — these are the desk's reading of the post, and
                     they should not be the first thing you read instead. */}
-                <div className="row" style={{ '--gap': '8px', flexWrap: 'wrap' }}>
+                <div
+                  className="row"
+                  style={{ '--gap': '8px', flexWrap: 'wrap' }}
+                >
                   <span className="chip">{c.category || 'General'}</span>
                   <SeverityBadge item={c} />
                   <StatusBadge status={statusOf(c)} />
-                  {c.verified && <span className="chip">Verified by {c.verified_by || 'the desk'}</span>}
+
+                  {c.verified && (
+                    <span className="chip">
+                      Verified by {c.verified_by || 'the desk'}
+                    </span>
+                  )}
                 </div>
 
                 <div className="post-actions">
-                  <Link className="post-action" to={`/complaint/${encodeURIComponent(c.id)}`}>
+                  <Link
+                    className="post-action"
+                    to={`/complaint/${encodeURIComponent(c.id)}`}
+                  >
                     <History size={15} aria-hidden="true" />
                     See the history
                   </Link>
+
                   {/* The reference, not an action — so it does not get the pill
                       treatment that would make it look pressable. */}
-                  <span className="mono hint" style={{ marginLeft: 6, fontSize: 12 }}>
+                  <span
+                    className="mono hint"
+                    style={{ marginLeft: 6, fontSize: 12 }}
+                  >
                     #{c.id}
                   </span>
                 </div>
