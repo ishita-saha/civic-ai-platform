@@ -18,7 +18,7 @@ import { initials } from '../lib/format';
  *
  * One form, one endpoint — the role comes back from the server with the
  * account, and nothing the visitor picks here changes it. The Resident /
- * Administrator switch only changes what the page *says* and which shortcut it
+ * Administrator switch only changes what the page says and which shortcut it
  * offers; typing the admin's email under the "Resident" tab still signs you in
  * as the admin.
  *
@@ -68,6 +68,7 @@ export default function Login({ onSignedIn }) {
   const attempt = async (withEmail, withPassword) => {
     setError('');
     setBusy(true);
+
     try {
       onSignedIn?.(await signIn(withEmail, withPassword));
     } catch (err) {
@@ -83,7 +84,7 @@ export default function Login({ onSignedIn }) {
     attempt(email, password);
   };
 
-  /** One press fills *and* submits — on a demo, filling is just an extra click. */
+  /** One press fills and submits — on a demo, filling is just an extra click. */
   const useAccount = (account) => {
     setEmail(account.email);
     setPassword(account.password);
@@ -107,9 +108,17 @@ export default function Login({ onSignedIn }) {
             margin: '0 auto 14px',
           }}
         >
-          {adminMode ? <ShieldCheck size={20} aria-hidden="true" /> : <LogIn size={20} aria-hidden="true" />}
+          {adminMode ? (
+            <ShieldCheck size={20} aria-hidden="true" />
+          ) : (
+            <LogIn size={20} aria-hidden="true" />
+          )}
         </span>
-        <h2 className="page-title">{adminMode ? 'Administrator sign in' : 'Resident sign in'}</h2>
+
+        <h2 className="page-title">
+          {adminMode ? 'Administrator sign in' : 'Resident sign in'}
+        </h2>
+
         <p className="page-lede" style={{ margin: '6px auto 0' }}>
           {adminMode
             ? 'The corporation account — the only one that can verify a report or send a crew.'
@@ -117,7 +126,12 @@ export default function Login({ onSignedIn }) {
         </p>
       </div>
 
-      <div className="segmented" role="tablist" aria-label="Account type" style={{ display: 'flex', marginBottom: 16 }}>
+      <div
+        className="segmented"
+        role="tablist"
+        aria-label="Account type"
+        style={{ display: 'flex', marginBottom: 16 }}
+      >
         {MODES.map((m) => (
           <button
             key={m.key}
@@ -127,7 +141,11 @@ export default function Login({ onSignedIn }) {
             onClick={() => setMode(m.key)}
             style={{ flex: 1, justifyContent: 'center' }}
           >
-            {m.key === 'admin' ? <ShieldCheck size={14} aria-hidden="true" /> : <UserRound size={14} aria-hidden="true" />}
+            {m.key === 'admin' ? (
+              <ShieldCheck size={14} aria-hidden="true" />
+            ) : (
+              <UserRound size={14} aria-hidden="true" />
+            )}
             {m.label}
           </button>
         ))}
@@ -205,9 +223,10 @@ export default function Login({ onSignedIn }) {
             <div>
               <span className="eyebrow">Quick sign-in</span>
               <p className="hint" style={{ marginTop: 4 }}>
-                Test accounts with the passwords in the open. One press signs you straight in.
+                Test accounts with the passwords hidden. One press signs you straight in.
               </p>
             </div>
+
             {listed.map((a) => (
               <QuickAccount
                 key={a.email}
@@ -226,11 +245,27 @@ export default function Login({ onSignedIn }) {
       {rosterState === 'failed' && (
         <div className="card" style={{ marginTop: 16, background: 'var(--c-surface-2)' }}>
           <div className="card-body row" style={{ '--gap': '10px', alignItems: 'flex-start' }}>
-            <WifiOff size={16} aria-hidden="true" style={{ marginTop: 2, flex: 'none', color: 'var(--c-warn)' }} />
+            <WifiOff
+              size={16}
+              aria-hidden="true"
+              style={{
+                marginTop: 2,
+                flex: 'none',
+                color: 'var(--c-warn)',
+              }}
+            />
+
             <div className="stack" style={{ '--gap': '4px', minWidth: 0 }}>
-              <span style={{ fontWeight: 560, color: 'var(--c-ink)', fontSize: 13.5 }}>
+              <span
+                style={{
+                  fontWeight: 560,
+                  color: 'var(--c-ink)',
+                  fontSize: 13.5,
+                }}
+              >
                 Can&rsquo;t list the demo accounts
               </span>
+
               <span className="hint" style={{ lineHeight: 1.5 }}>
                 The API isn&rsquo;t answering on port 8000, so sign-in will fail too. Start it with{' '}
                 <code className="mono">python main.py</code> in <code className="mono">backend/</code>.
@@ -260,13 +295,15 @@ function QuickAccount({ account, onPick, disabled, admin }) {
       >
         {admin ? <ShieldCheck size={14} /> : initials(account.name)}
       </span>
+
       <span style={{ minWidth: 0 }}>
         <span className="row" style={{ '--gap': '7px' }}>
           <span style={{ fontWeight: 560 }}>{account.name}</span>
           {admin && <span className="chip">Admin</span>}
         </span>
+
         <span className="hint mono" style={{ display: 'block', fontWeight: 400 }}>
-          {account.email} · {account.password}
+          {account.email} · {'•'.repeat(account.password?.length || 8)}
         </span>
       </span>
     </button>
