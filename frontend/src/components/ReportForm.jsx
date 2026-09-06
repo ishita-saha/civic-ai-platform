@@ -5,6 +5,7 @@ import {
   CheckCircle2,
   Crosshair,
   Loader2,
+  MessageCircle,
   RotateCcw,
   Send,
   ShieldCheck,
@@ -14,6 +15,7 @@ import { readableError } from '../lib/api';
 import { useAuth } from '../lib/authContext';
 import { CATEGORIES } from '../lib/demoData';
 import { useToast } from '../lib/toastContext';
+import ChatWindow from './ChatWindow';
 
 const EMPTY = { fullName: '', phone: '', email: '', title: '', description: '', category: 'Roads' };
 
@@ -50,6 +52,7 @@ export default function ReportForm({ onSubmitted }) {
   const [submitting, setSubmitting] = useState(false);
   const [receipt, setReceipt] = useState(null);
   const [electricityEmergency, setElectricityEmergency] = useState(null);
+  const [chatOpen, setChatOpen] = useState(false);
   const previewRef = useRef('');
 
   /**
@@ -295,6 +298,15 @@ if (!response.ok) {
                   )}
                   <button
                     type="button"
+                    className="btn btn-primary"
+                    onClick={() => setChatOpen(true)}
+                  >
+                    <MessageCircle size={15} aria-hidden="true" />
+                    Chat with Staff
+                  </button>
+
+                  <button
+                    type="button"
                     className="btn"
                     onClick={() => setElectricityEmergency(null)}
                   >
@@ -308,6 +320,18 @@ if (!response.ok) {
               </div>
             </div>
           </div>
+        )}
+
+        {chatOpen && electricityEmergency && receipt.id != null && (
+          <ChatWindow
+            complaintId={receipt.id}
+            citizenName={values.fullName || 'Citizen'}
+            staff={
+              electricityEmergency.assigned_contact ||
+              electricityEmergency.contact
+            }
+            onClose={() => setChatOpen(false)}
+          />
         )}
 
         <div className="card page-enter" style={{ maxWidth: 620, margin: '0 auto' }}>
